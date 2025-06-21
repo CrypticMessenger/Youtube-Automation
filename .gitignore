@@ -1,5 +1,6 @@
 audios/*
 transcripts/*
 videos/*
+viral_analysis/*
 .env
 __pycache__
