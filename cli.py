@@ -114,7 +114,7 @@ def parse_arguments():
     list_parser = manage_subparsers.add_parser( # noqa: F841 -- assigned but not used directly, but needed for argparser
         "list", help="List all entries in the manifest"
     )
-    # list_parser takes no arguments other than the global --manifest-file
+    # The 'list' sub-command itself doesn't take additional arguments beyond the global ones like --manifest-file.
 
     args = parser.parse_args()
 

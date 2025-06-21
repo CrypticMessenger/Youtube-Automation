@@ -19,14 +19,15 @@ def convert_to_mp3(input_path, output_mp3_path):
                 "192k",
                 output_mp3_path,
             ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=True,
+            stdout=subprocess.DEVNULL, # Suppress ffmpeg output to keep console clean
+            stderr=subprocess.DEVNULL, # Suppress ffmpeg errors, handled by check=True
+            check=True, # Raise CalledProcessError on non-zero exit status
         )
+        # Clean up temporary input file if it was a temporary audio stream download
         if (
-            "_audiotemp." in os.path.basename(input_path)
+            "_audiotemp." in os.path.basename(input_path) # Check if it's a temp file
             and os.path.exists(input_path)
-            and input_path != output_mp3_path # Don't remove if input was already the target mp3
+            and input_path != output_mp3_path # Ensure we don't delete the output if it's same as input (e.g. re-encoding an mp3)
         ):
             try:
                 os.remove(input_path)
@@ -40,11 +41,12 @@ def convert_to_mp3(input_path, output_mp3_path):
         print(
             f"[ERROR] ffmpeg conversion failed (return code {e.returncode}): {' '.join(e.cmd)}"
         )
-    except Exception as e:
+    except Exception as e: # Catch other potential errors during conversion
         print(
             f"[ERROR] ffmpeg conversion failed: {e} for {input_path} to {output_mp3_path}"
         )
-    # Attempt to remove temp file even on error, if it exists and is a temp file
+
+    # Attempt to remove temporary input file even on conversion error, if it exists and is a temp file
     if (
         "_audiotemp." in os.path.basename(input_path)
         and os.path.exists(input_path)
