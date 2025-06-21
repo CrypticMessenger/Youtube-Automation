@@ -2,3 +2,4 @@ audios/*
 transcripts/*
 videos/*
 .env
+__pycache__
