@@ -33,7 +33,6 @@ def process_youtube_url(args, manifest_df, manifest_path):
     entry = get_manifest_entry(manifest_df, canonical_url)
 
     if entry is None:
-        # This is a key part of the flow, so keep some info
         print(
             f"[INFO] No existing manifest entry for {canonical_url}. Creating new one."
         )
@@ -48,11 +47,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 f"[CRITICAL_ERROR] Failed to create or retrieve new manifest entry for {canonical_url}. Aborting processing for this URL."
             )
             return manifest_df
-        # print(f"[DEBUG] New entry created and retrieved for {canonical_url}.") # Too verbose
-    # else: # No need to print if found, normal operation
-        # print(
-            # f"[DEBUG] Found existing manifest entry for canonical URL: {canonical_url}."
-        # )
+    # No specific logging if entry is found, it's the normal path.
 
     manifest_base_name = entry.get("base_filename")
     if pd.isna(manifest_base_name) or not str(manifest_base_name).strip():
@@ -74,38 +69,14 @@ def process_youtube_url(args, manifest_df, manifest_path):
             )
         base_name_for_paths = manifest_base_name
 
-    # print(f"[DEBUG] Using base_name_for_paths: '{base_name_for_paths}'") # Can be inferred or logged by specific download functions if needed
+    # Base name for paths is now determined.
 
     # --- 1. Video Download ---
     video_download_path_from_manifest = entry.get("video_path")
     video_status_from_manifest = entry.get("status_video_downloaded")
     video_download_path_to_use = None
 
-    # Reduced verbosity for cache checks. Will print only if cache hit or miss.
-    # print("\n--- Video Download Cache Check ---")
-    # print(f"URL: {canonical_url}")
-    # print(f"Force processing: {force_processing}")
-    # print(
-    #     f"Status from manifest: {video_status_from_manifest} (type: {type(video_status_from_manifest)})"
-    # )
-    # print(
-    #     f"Is status True? (video_status_from_manifest == True): {video_status_from_manifest == True}"
-    # )
-    # print(f"Path from manifest: {video_download_path_from_manifest}")
-    # print(
-    #     f"Is path notna? (pd.notna(video_download_path_from_manifest)): {pd.notna(video_download_path_from_manifest)}"
-    # )
-    # if (
-    #     pd.notna(video_download_path_from_manifest)
-    #     and str(video_download_path_from_manifest).strip()
-    # ):
-    #     print(
-    #         f"Does path exist? (os.path.exists(str(video_download_path_from_manifest))): {os.path.exists(str(video_download_path_from_manifest))}"
-    #     )
-    # else:
-    #     print(f"Path is NA, None, or empty; os.path.exists not checked.")
-    # print("--- End Video Download Cache Check ---\n")
-
+    # Cache check logic for video download.
     if not args.audio: # Not in audio-only mode
         if (
             not force_processing
@@ -169,10 +140,8 @@ def process_youtube_url(args, manifest_df, manifest_path):
     needs_mp3 = args.audio or args.transcribe or args.viral_short_identifier
     mp3_file_for_processing = None
 
+    # Cache check logic for MP3 conversion.
     if needs_mp3:
-        # print("\n--- MP3 Conversion Cache Check ---") # Reduced verbosity
-        # print(f"URL: {canonical_url}, Force: {force_processing}, Status: {mp3_status_from_manifest}, Path: {mp3_path_from_manifest}") # Too verbose
-
         if (
             not force_processing
             and mp3_status_from_manifest == True
@@ -261,12 +230,8 @@ def process_youtube_url(args, manifest_df, manifest_path):
     transcript_status_from_manifest = entry.get("status_transcript_generated")
     needs_transcription = args.transcribe or args.viral_short_identifier
 
+    # Cache check logic for transcription.
     if needs_transcription:
-        # print("\n--- Transcription Cache Check ---") # Reduced verbosity
-        # print(f"URL: {canonical_url}, Force: {force_processing}, Status: {transcript_status_from_manifest}, Path: {transcript_path_from_manifest}") # Too verbose
-        # print(f"MP3 available for processing: {mp3_file_for_processing if mp3_file_for_processing else 'No'}") # Redundant with later checks
-
-
         if mp3_file_for_processing and os.path.exists(mp3_file_for_processing):
             if (
                 not force_processing
@@ -390,12 +355,8 @@ def process_youtube_url(args, manifest_df, manifest_path):
     analysis_path_from_manifest = entry.get("analysis_path")
     analysis_status_from_manifest = entry.get("status_analysis_generated")
 
+    # Cache check logic for viral clip analysis.
     if args.viral_short_identifier:
-        # print("\n--- Viral Clip Analysis Cache Check ---") # Reduced verbosity
-        # print(f"URL: {canonical_url}, Force: {force_processing}, Status: {analysis_status_from_manifest}, Path: {analysis_path_from_manifest}") # Too verbose
-        # print(f"Transcript content available: {'Yes' if transcript_content and transcript_content.strip() else 'No'}") # Redundant with later checks
-
-
         cached_analysis_valid_and_present = False
         if (
             not force_processing
@@ -503,32 +464,26 @@ def handle_remove_url(url_to_remove_input, manifest_df, manifest_path):
     yt_remove, url_to_remove_canonical = get_yt_object_and_canonical_url(url_to_remove_input)
 
     if not yt_remove:
-        # This warning is important flow information
         print(
             f"[WARNING] Could not get canonical URL for '{url_to_remove_input}'. Trying to remove using the provided input."
         )
         url_to_remove_canonical = url_to_remove_input
-    # else: # No need to print if successful, the next message will imply it.
-        # print(
-            # f"[INFO] Attempting to remove canonical URL: {url_to_remove_canonical} (from input {url_to_remove_input})"
-        # )
+    # If yt_remove is successful, canonical_url is used silently.
 
     entry = get_manifest_entry(manifest_df, url_to_remove_canonical)
     if entry is None:
         if url_to_remove_canonical != url_to_remove_input: # If canonical was different and not found
-            # print( # This is a bit too detailed, the final "not found" is enough
-                # f"[INFO] Canonical URL '{url_to_remove_canonical}' not found. Trying original input '{url_to_remove_input}'."
-            # )
-            entry = get_manifest_entry(manifest_df, url_to_remove_input) # Try original
+            # Attempt to find using the original input if canonical lookup failed
+            entry = get_manifest_entry(manifest_df, url_to_remove_input)
             if entry is None:
                 print(
                     f"[INFO] URL not found in manifest (tried canonical and original input): {url_to_remove_input}"
                 )
                 return manifest_df
             else: # Original input was found
-                url_to_remove_canonical = url_to_remove_input # Update to original if that's what was found
+                url_to_remove_canonical = url_to_remove_input
                 print(f"[INFO] Found URL using original input: {url_to_remove_canonical}")
-        else: # Original input was used, and not found
+        else: # Original input was used (same as canonical or canonical failed early), and not found
             print(f"[INFO] URL not found in manifest: {url_to_remove_canonical}")
             return manifest_df
 
@@ -574,16 +529,13 @@ def handle_list_manifest(manifest_df):
     with pd.option_context(
         "display.max_colwidth", 50, "display.width", 1000, "display.max_rows", 25
     ):
-        # Display relevant columns only for brevity
         cols_to_display = ["youtube_url", "base_filename", "status_video_downloaded", "status_mp3_converted", "status_transcript_generated", "status_analysis_generated"]
-        # Filter out columns that might not exist to prevent errors if manifest is old/different
+        # Filter out columns that might not exist to prevent errors
         cols_to_display = [col for col in cols_to_display if col in manifest_df.columns]
-        if not cols_to_display: # if all preferred columns are somehow missing, show all
-            print(manifest_df.head(20).to_string())
+        if not cols_to_display:
+            print(manifest_df.head(20).to_string()) # Fallback to all if preferred are missing
         else:
             print(manifest_df[cols_to_display].head(20).to_string())
 
     print(f"--- Total entries: {len(manifest_df)} ---")
-    # print("\n--- Manifest Dtypes ---") # Too verbose for general listing
-    # print(manifest_df.dtypes)
     print("--- End of Manifest List ---\n")

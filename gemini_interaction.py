@@ -5,10 +5,8 @@ import google.generativeai as genai
 
 def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): # Renamed to avoid conflict if we later import the original prompts.py for some reason
     """
-    Internal helper to generate the prompt text for identifying viral clips.
-    This function was moved from prompts.py and adapted.
-    The original prompts.py also had a placeholder for the transcript,
-    which is now directly passed as transcript_text.
+    Generates the prompt text for identifying viral clips using a detailed template.
+    The number of sections and transcript are injected into the template.
     """
     prompt_template = """
     You are an Expert Short-Form Video Editor and Viral Content Strategist. Your mission is to analyze the provided YouTube video transcript and identify segments that can be directly trimmed into highly engaging, viral-potential short-form videos (like Instagram Reels, TikToks, or YouTube Shorts), each between 30 and 50 seconds in length.
@@ -75,7 +73,7 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): 
 
     return prompt_template.format(
         number_of_sections_placeholder=number_of_sections_placeholder_text,
-        youtube_transcript_placeholder=transcript_text, # Direct substitution
+        youtube_transcript_placeholder=transcript_text,
     )
 
 
@@ -136,8 +134,7 @@ def transcribe_audio_gemini(
                     and response.candidates[0].content.parts[0].text
                 ):
                     transcript_text = response.candidates[0].content.parts[0].text
-                    # if transcript_text.strip(): # This is too granular
-                        # print("[INFO] Extracted text via response.candidates.")
+                    # This was a granular log, already commented out.
             except Exception as e_parse:
                 print(f"[ERROR] Parsing Gemini response candidates: {e_parse}")
 
@@ -165,7 +162,7 @@ def transcribe_audio_gemini(
     except Exception as e:
         print(f"[ERROR] Gemini transcription failed: {e}")
         import traceback
-        traceback.print_exc()
+        traceback.print_exc() # Keep traceback for debugging errors with Gemini API
         return {"text": None, "path": None}
     finally:
         if uploaded_audio_file_details:
@@ -197,7 +194,6 @@ def identify_viral_clips_gemini(
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name=model_name)
-        # Use the internal helper for prompt text
         prompt = get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections)
         response = model.generate_content([prompt], request_options={"timeout": 900})
 
@@ -222,8 +218,7 @@ def identify_viral_clips_gemini(
                     and response.candidates[0].content.parts[0].text
                 ):
                     analysis_text = response.candidates[0].content.parts[0].text
-                    # if analysis_text.strip(): # This is too granular
-                        # print("[INFO] Extracted analysis via response.candidates.")
+                    # This was a granular log, already commented out.
             except Exception as e_parse:
                 print(
                     f"[ERROR] Parsing Gemini response candidates for analysis: {e_parse}"
@@ -242,10 +237,10 @@ def identify_viral_clips_gemini(
             return analysis_file_path
         else:
             print(f"[WARNING] Empty viral clip analysis saved: {analysis_file_path}")
-            return analysis_file_path  # Return path even if empty, status will reflect content
+            return analysis_file_path  # Return path even if content is empty, manifest status will reflect this
 
     except Exception as e:
         print(f"[ERROR] Gemini viral clip ID failed: {e}")
         import traceback
-        traceback.print_exc()
+        traceback.print_exc() # Keep traceback for debugging errors with Gemini API
         return None
