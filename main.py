@@ -26,12 +26,12 @@ def main():
             # sys.exit(1)
 
     manifest_df = load_manifest(args.manifest_file)
-    print("--- Manifest Dtypes after initial load ---")
-    print(
-        manifest_df.dtypes
-        if not manifest_df.empty
-        else "Manifest is empty, dtypes not applicable yet."
-    )
+    # print("--- Manifest Dtypes after initial load ---") # Too verbose
+    # print( # Too verbose
+    #     manifest_df.dtypes
+    #     if not manifest_df.empty
+    #     else "Manifest is empty, dtypes not applicable yet."
+    # )
 
     if args.command_name == "process":
         # Effective directory setup is now handled within parse_arguments in cli.py
@@ -39,23 +39,24 @@ def main():
         # orchestrator.process_youtube_url handles its own manifest saving per step.
         # A final save here ensures the latest state is written if any intermediate step failed
         # but the manifest was modified.
-        save_manifest(manifest_df, args.manifest_file)
-        print(f"[INFO] Final manifest state saved to {args.manifest_file} after process command.")
+    # save_manifest(manifest_df, args.manifest_file) # Orchestrator saves after each logical step.
+    # print(f"[INFO] Final manifest state saved to {args.manifest_file} after process command.") # Redundant if orchestrator saves
+    pass # No final save needed here as orchestrator handles it.
 
     elif args.command_name == "manage":
         if args.manage_action == "remove":
             manifest_df = handle_remove_url(args.url, manifest_df, args.manifest_file)
-            # handle_remove_url in orchestrator now saves the manifest
+        # handle_remove_url in orchestrator now saves the manifest, so no save needed here.
+        # print(f"[INFO] Manifest updated and saved by remove operation via orchestrator to {args.manifest_file}.")
         elif args.manage_action == "list":
             handle_list_manifest(manifest_df)
             # list does not modify, so no save needed from here.
 
         # Save manifest after manage operations (if not already saved by handler like remove)
-        # This is a bit redundant if handler saves, but safe.
-        # handle_remove_url now saves, so this is mainly for other future manage commands.
-        if args.manage_action != "list": # List doesn't change manifest
-             save_manifest(manifest_df, args.manifest_file)
-             print(f"[INFO] Final manifest state saved to {args.manifest_file} after manage operation.")
+    # This is now handled by individual manage handlers if they modify the manifest.
+    # if args.manage_action != "list": # List doesn't change manifest
+    #      save_manifest(manifest_df, args.manifest_file)
+    #      print(f"[INFO] Final manifest state saved to {args.manifest_file} after manage operation.")
 
 
 if __name__ == "__main__":

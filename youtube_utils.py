@@ -20,30 +20,38 @@ def download_video(yt, base_name_for_paths, effective_video_dir, resolution_arg)
             progressive=True,
             file_extension="mp4",
         ).first()
-    if not target_stream:
-        print(
-            f"[INFO] No stream for res '{resolution_arg}' (progressive, mp4). Trying any progressive mp4."
-        )
-        target_stream = (
-            yt.streams.filter(progressive=True, file_extension="mp4")
-            .order_by("resolution")
-            .desc()
-            .first()
-        )
-    if not target_stream:
-        print(
-            f"[INFO] No progressive mp4 stream. Trying highest resolution adaptive mp4 video stream."
-        )
-        target_stream = (
-            yt.streams.filter(
-                adaptive=True, file_extension="mp4", only_video=True
+        stream_search_attempts = 1
+        if not target_stream:
+            # print( # This level of detail is too much for normal operation
+            #     f"[INFO] No stream for res '{resolution_arg}' (progressive, mp4). Trying any progressive mp4."
+            # )
+            target_stream = (
+                yt.streams.filter(progressive=True, file_extension="mp4")
+                .order_by("resolution")
+                .desc()
+                .first()
             )
-            .order_by("resolution")
-            .desc()
-            .first()
-        )
+            stream_search_attempts = 2
+        if not target_stream:
+            # print( # This level of detail is too much
+            #     f"[INFO] No progressive mp4 stream. Trying highest resolution adaptive mp4 video stream."
+            # )
+            target_stream = (
+                yt.streams.filter(
+                    adaptive=True, file_extension="mp4", only_video=True
+                )
+                .order_by("resolution")
+                .desc()
+                .first()
+            )
+            stream_search_attempts = 3
 
     if target_stream:
+        if stream_search_attempts > 1:
+             print(f"[INFO] Selected video stream after {stream_search_attempts} attempts: res={target_stream.resolution}, type={target_stream.mime_type}")
+        else:
+             print(f"[INFO] Selected video stream: res={target_stream.resolution}, type={target_stream.mime_type}")
+
         file_extension = target_stream.subtype
         if not file_extension:
             if target_stream.mime_type and "/" in target_stream.mime_type:
@@ -52,6 +60,7 @@ def download_video(yt, base_name_for_paths, effective_video_dir, resolution_arg)
                 file_extension = "mp4" # Default fallback
         video_filename = f"{base_name_for_paths}.{file_extension}"
         os.makedirs(effective_video_dir, exist_ok=True)
+        print(f"[INFO] Attempting to download video: {video_filename} to {effective_video_dir}")
         try:
             downloaded_path = target_stream.download(
                 output_path=effective_video_dir, filename=video_filename
@@ -63,13 +72,14 @@ def download_video(yt, base_name_for_paths, effective_video_dir, resolution_arg)
             return None
     else:
         print(
-            f"[ERROR] No suitable video stream found for {base_name_for_paths}. Skipping video download."
+            f"[ERROR] No suitable video stream found for {base_name_for_paths} (tried {resolution_arg} and fallbacks). Skipping video download."
         )
         return None
 
 def download_audio_stream(yt, base_name_for_paths, effective_audio_dir):
     """Downloads a dedicated audio stream, typically for later conversion."""
     audio_stream = yt.streams.get_audio_only()
+    stream_type_selected = "default audio_only"
     if not audio_stream:
         audio_stream = (
             yt.streams.filter(only_audio=True)
@@ -77,9 +87,13 @@ def download_audio_stream(yt, base_name_for_paths, effective_audio_dir):
             .desc()
             .first()
         )
+        stream_type_selected = "filtered highest abr audio"
+
     if audio_stream:
+        print(f"[INFO] Selected audio stream ({stream_type_selected}): type={audio_stream.mime_type}, abr={audio_stream.abr}")
         temp_audio_filename = f"{base_name_for_paths}_audiotemp.{audio_stream.subtype or 'mp4'}"
         os.makedirs(effective_audio_dir, exist_ok=True)
+        print(f"[INFO] Attempting to download audio stream: {temp_audio_filename} to {effective_audio_dir}")
         try:
             raw_audio_input_path = audio_stream.download(
                 output_path=effective_audio_dir,
