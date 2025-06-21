@@ -147,7 +147,7 @@ This section outlines planned enhancements and future project ideas.
 *   [x] Figure out way to download youtube videos
 *   [x] Figure out way to download youtube videos audio
 *   [x] Figure out way to download youtube videos transcripts
-*   [ ] Figure out a prompt to find the most plausible parts of the video that are likely to be useful as a reel (max 30-50 seconds)
+*   [x] Figure out a prompt to find the most plausible parts of the video that are likely to be useful as a reel (max 30-50 seconds)
     *   [ ] Does sending audio/video will help in finding the most plausible parts of the video? or transcript is enough?
     *   [ ] Transcription currently consists only transcription, without timestamps, so we need to figure out a way to get the timestamps for the transcription (e.g., investigate Gemini's capabilities for timestamped transcription or integrate a library like `stable-ts` or `whisperX`).
 *   [ ] Figure out a way to automatically clip the video based on the prompt and save the clips (e.g., using FFmpeg with timestamps).

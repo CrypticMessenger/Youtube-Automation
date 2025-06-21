@@ -35,7 +35,6 @@ def main():
         manifest_df = process_youtube_url(args, manifest_df, args.manifest_file)
         # Manifest saving is handled within process_youtube_url for each logical step.
         # No final save is needed here.
-        pass
 
     elif args.command_name == "manage":
         if args.manage_action == "remove":
