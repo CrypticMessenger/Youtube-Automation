@@ -46,5 +46,9 @@ theme like : Docker under 60 seconds etc.
 
 ---
 
-- yt_video_fetcher - to fetch youtube video, audio and transcript
-- yt_video_clipper - to clip the video based on the prompt
+```
+python3 main.py process "https://youtu.be/jwr1EOvAxQI\?si\=_ZBOy2GzaUdV7jUz" \
+    --output "/Users/ambrose_/Desktop/exploration/ProjectGoliathYoutubeAutomation" \
+    --transcribe \
+    --viral-short-identifier
+```
