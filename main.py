@@ -41,7 +41,7 @@ def main():
         # but the manifest was modified.
     # save_manifest(manifest_df, args.manifest_file) # Orchestrator saves after each logical step.
     # print(f"[INFO] Final manifest state saved to {args.manifest_file} after process command.") # Redundant if orchestrator saves
-    pass # No final save needed here as orchestrator handles it.
+    # pass # No final save needed here as orchestrator handles it.
 
     elif args.command_name == "manage":
         if args.manage_action == "remove":
