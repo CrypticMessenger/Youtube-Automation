@@ -1,7 +1,7 @@
 audios/*
 transcripts/*
 videos/*
+viral_analysis/*
 .env
 __pycache__
-viral_analysis/*
 processing_manifest.csv
