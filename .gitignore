@@ -3,3 +3,4 @@ transcripts/*
 videos/*
 .env
 __pycache__
+viral_analysis/*
