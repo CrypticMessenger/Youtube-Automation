@@ -136,8 +136,8 @@ def transcribe_audio_gemini(
                     and response.candidates[0].content.parts[0].text
                 ):
                     transcript_text = response.candidates[0].content.parts[0].text
-                    if transcript_text.strip():
-                        print("[INFO] Extracted text via response.candidates.")
+                    # if transcript_text.strip(): # This is too granular
+                        # print("[INFO] Extracted text via response.candidates.")
             except Exception as e_parse:
                 print(f"[ERROR] Parsing Gemini response candidates: {e_parse}")
 
@@ -222,8 +222,8 @@ def identify_viral_clips_gemini(
                     and response.candidates[0].content.parts[0].text
                 ):
                     analysis_text = response.candidates[0].content.parts[0].text
-                    if analysis_text.strip():
-                        print("[INFO] Extracted analysis via response.candidates.")
+                    # if analysis_text.strip(): # This is too granular
+                        # print("[INFO] Extracted analysis via response.candidates.")
             except Exception as e_parse:
                 print(
                     f"[ERROR] Parsing Gemini response candidates for analysis: {e_parse}"
