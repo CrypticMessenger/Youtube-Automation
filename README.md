@@ -82,7 +82,10 @@ python3 main.py process <youtube_url> [options]
 *   `--gemini-model <model_name>`: Gemini model to use for transcription (default: `gemini-1.5-flash-latest`).
 *   `--viral-short-identifier`: Identify potential viral short clips from the transcript. (Requires `GOOGLE_API_KEY`).
 *   `--number-of-sections <count>`: Number of viral sections for the AI to find (e.g., `3`, `5`).
-*   `--clip-identifier-model <model_name>`: Gemini model for clip identification (default: `gemini-1.5-pro-latest`).
+*   `--clip-identifier-model <model_name>`: Gemini model for clip identification (default: `gemini-2.5-flash`).
+*   `--generate-captions`: Generate caption files (.srt, .vtt, .txt) using OpenAI's Whisper. Requires `openai-whisper` to be installed.
+*   `--whisper-model <model_name>`: Whisper model to use for caption generation (e.g., `small`, `base`, `medium`, `large`). Defaults to `small`.
+*   `--caption-dir <directory>`: Specific directory for caption files (default: `<output_dir>/captions`).
 *   `--force`: Force re-processing of all steps, ignoring any cached files or statuses in the manifest.
 *   `--manifest-file <path>`: Path to the processing manifest CSV file (default: `processing_manifest.csv`).
 
@@ -150,6 +153,7 @@ This section outlines planned enhancements and future project ideas.
 *   [x] Figure out a prompt to find the most plausible parts of the video that are likely to be useful as a reel (max 30-50 seconds)
     *   [ ] Does sending audio/video will help in finding the most plausible parts of the video? or transcript is enough?
     *   [ ] Transcription currently consists only transcription, without timestamps, so we need to figure out a way to get the timestamps for the transcription (e.g., investigate Gemini's capabilities for timestamped transcription or integrate a library like `stable-ts` or `whisperX`).
+        *   **Note:** An alternative for generating timestamped captions is to use OpenAI's Whisper CLI. After generating an MP3, you can run `whisper <audio_path>/<audio>.mp3 --model small` to get `.srt`, `.vtt`, and other caption files with word-level timestamps.
 *   [ ] Figure out a way to automatically clip the video based on the prompt and save the clips (e.g., using FFmpeg with timestamps).
 
 ### New Youtube Reel Creator (Future Project Idea)

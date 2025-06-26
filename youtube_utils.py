@@ -11,6 +11,7 @@ def get_sanitized_base_name(yt_title, custom_filename=None):
 
 def download_video(yt, base_name_for_paths, effective_video_dir, resolution_arg):
     """Downloads the video stream."""
+    stream_search_attempts = 1
     target_stream = None
     if resolution_arg == "highest":
         target_stream = yt.streams.get_highest_resolution()

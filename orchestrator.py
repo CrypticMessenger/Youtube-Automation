@@ -15,7 +15,7 @@ from youtube_utils import (
     download_audio_stream,
     get_yt_object_and_canonical_url,
 )
-from audio_processing import convert_to_mp3
+from audio_processing import convert_to_mp3, generate_caption_files
 from gemini_interaction import transcribe_audio_gemini, identify_viral_clips_gemini
 
 
@@ -137,11 +137,13 @@ def process_youtube_url(args, manifest_df, manifest_path):
     # --- 2. MP3 Conversion ---
     mp3_path_from_manifest = entry.get("mp3_path")
     mp3_status_from_manifest = entry.get("status_mp3_converted")
-    needs_mp3 = args.audio or args.transcribe or args.viral_short_identifier
+    needs_mp3 = args.audio or args.transcribe or args.viral_short_identifier or args.generate_captions
     mp3_file_for_processing = None
 
     # Cache check logic for MP3 conversion.
     if needs_mp3:
+        # --- Improved Cache Logic ---
+        # Default to manifest path if valid
         if (
             not force_processing
             and mp3_status_from_manifest == True
@@ -149,9 +151,27 @@ def process_youtube_url(args, manifest_df, manifest_path):
             and str(mp3_path_from_manifest).strip()
             and os.path.exists(str(mp3_path_from_manifest))
         ):
-            print(f"[CACHE] Using existing MP3: {mp3_path_from_manifest}")
+            print(f"[CACHE] Using existing MP3 from manifest: {mp3_path_from_manifest}")
             mp3_file_for_processing = str(mp3_path_from_manifest)
         else:
+            # Fallback to check expected path
+            expected_mp3_path = os.path.join(args.effective_audio_dir, base_name_for_paths + ".mp3")
+            if not force_processing and os.path.exists(expected_mp3_path):
+                print(f"[CACHE] Found existing MP3 at expected path, updating manifest: {expected_mp3_path}")
+                mp3_file_for_processing = os.path.abspath(expected_mp3_path)
+                manifest_df = update_manifest_entry(
+                    manifest_df,
+                    canonical_url,
+                    {
+                        "mp3_path": mp3_file_for_processing,
+                        "status_mp3_converted": True,
+                    },
+                )
+                entry = get_manifest_entry(manifest_df, canonical_url)
+                save_manifest(manifest_df, manifest_path)
+
+        # If after all checks, we still don't have a file, generate it.
+        if not mp3_file_for_processing:
             if mp3_status_from_manifest == True and (
                 not pd.notna(mp3_path_from_manifest)
                 or not str(mp3_path_from_manifest).strip()
@@ -215,6 +235,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                     )
                 entry = get_manifest_entry(manifest_df, canonical_url)
             save_manifest(manifest_df, manifest_path)
+
     elif mp3_status_from_manifest != False or pd.notna(mp3_path_from_manifest): # If not needed, but manifest had info
         manifest_df = update_manifest_entry(
             manifest_df,
@@ -455,6 +476,133 @@ def process_youtube_url(args, manifest_df, manifest_path):
         entry = get_manifest_entry(manifest_df, canonical_url)
         save_manifest(manifest_df, manifest_path)
 
+    # --- 5. Caption Generation ---
+    caption_srt_path_from_manifest = entry.get("caption_srt_path")
+    caption_vtt_path_from_manifest = entry.get("caption_vtt_path")
+    caption_txt_path_from_manifest = entry.get("caption_txt_path")
+    caption_status_from_manifest = entry.get("status_captions_generated")
+
+    if args.generate_captions:
+        cached_captions_valid_and_present = False
+        # --- Improved Cache Logic ---
+        # Default to manifest path if valid
+        if (
+            not force_processing
+            and caption_status_from_manifest == True
+            and pd.notna(caption_srt_path_from_manifest)
+            and os.path.exists(str(caption_srt_path_from_manifest))
+            and pd.notna(caption_vtt_path_from_manifest)
+            and os.path.exists(str(caption_vtt_path_from_manifest))
+            and pd.notna(caption_txt_path_from_manifest)
+            and os.path.exists(str(caption_txt_path_from_manifest))
+        ):
+            print(f"[CACHE] Using existing captions from manifest: {caption_srt_path_from_manifest}, etc.")
+            cached_captions_valid_and_present = True
+        else:
+            # Fallback to check expected paths
+            expected_srt_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".srt")
+            expected_vtt_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".vtt")
+            expected_txt_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".txt")
+            if (
+                not force_processing and
+                os.path.exists(expected_srt_path) and
+                os.path.exists(expected_vtt_path) and
+                os.path.exists(expected_txt_path)
+            ):
+                print(f"[CACHE] Found existing caption files at expected paths, updating manifest: {args.effective_caption_dir}")
+                manifest_df = update_manifest_entry(
+                    manifest_df,
+                    canonical_url,
+                    {
+                        "caption_srt_path": os.path.abspath(expected_srt_path),
+                        "caption_vtt_path": os.path.abspath(expected_vtt_path),
+                        "caption_txt_path": os.path.abspath(expected_txt_path),
+                        "status_captions_generated": True,
+                    },
+                )
+                entry = get_manifest_entry(manifest_df, canonical_url)
+                save_manifest(manifest_df, manifest_path)
+                cached_captions_valid_and_present = True
+
+        if not cached_captions_valid_and_present:
+            if caption_status_from_manifest == True and (
+                not pd.notna(caption_srt_path_from_manifest)
+                or not os.path.exists(str(caption_srt_path_from_manifest))
+                or not pd.notna(caption_vtt_path_from_manifest)
+                or not os.path.exists(str(caption_vtt_path_from_manifest))
+                or not pd.notna(caption_txt_path_from_manifest)
+                or not os.path.exists(str(caption_txt_path_from_manifest))
+            ):
+                print(
+                    f"[INFO] Caption status was True, but files missing/path invalid. Re-generating captions for {base_name_for_paths}."
+                )
+            elif force_processing:
+                print(f"[INFO] Force processing captions for {base_name_for_paths}.")
+
+        if mp3_file_for_processing and os.path.exists(mp3_file_for_processing):
+            if not cached_captions_valid_and_present:
+                print("[INFO] Generating caption files...")
+                os.makedirs(args.effective_caption_dir, exist_ok=True)
+                caption_paths = generate_caption_files(
+                    mp3_file_for_processing,
+                    args.effective_caption_dir,
+                    base_name_for_paths,
+                    args.whisper_model,
+                )
+                if caption_paths:
+                    manifest_df = update_manifest_entry(
+                        manifest_df,
+                        canonical_url,
+                        {
+                            "caption_srt_path": os.path.abspath(caption_paths["srt"]),
+                            "caption_vtt_path": os.path.abspath(caption_paths["vtt"]),
+                            "caption_txt_path": os.path.abspath(caption_paths["txt"]),
+                            "status_captions_generated": True,
+                        },
+                    )
+                else:
+                    print(f"[ERROR] Caption generation failed for {canonical_url}.")
+                    manifest_df = update_manifest_entry(
+                        manifest_df,
+                        canonical_url,
+                        {
+                            "caption_srt_path": pd.NA,
+                            "caption_vtt_path": pd.NA,
+                            "caption_txt_path": pd.NA,
+                            "status_captions_generated": False,
+                        },
+                    )
+                entry = get_manifest_entry(manifest_df, canonical_url)
+                save_manifest(manifest_df, manifest_path)
+        else:
+            print("[WARNING] MP3 not available or path invalid, skipping caption generation.")
+            if caption_status_from_manifest != False or pd.notna(caption_srt_path_from_manifest):
+                manifest_df = update_manifest_entry(
+                    manifest_df,
+                    canonical_url,
+                    {
+                        "caption_srt_path": pd.NA,
+                        "caption_vtt_path": pd.NA,
+                        "caption_txt_path": pd.NA,
+                        "status_captions_generated": False,
+                    },
+                )
+                entry = get_manifest_entry(manifest_df, canonical_url)
+                save_manifest(manifest_df, manifest_path)
+    elif caption_status_from_manifest != False or pd.notna(caption_srt_path_from_manifest):
+        manifest_df = update_manifest_entry(
+            manifest_df,
+            canonical_url,
+            {
+                "caption_srt_path": pd.NA,
+                "caption_vtt_path": pd.NA,
+                "caption_txt_path": pd.NA,
+                "status_captions_generated": False,
+            },
+        )
+        entry = get_manifest_entry(manifest_df, canonical_url)
+        save_manifest(manifest_df, manifest_path)
+
     print(f"[INFO] Processing for {canonical_url} complete.")
     return manifest_df
 
@@ -495,6 +643,9 @@ def handle_remove_url(url_to_remove_input, manifest_df, manifest_path):
         entry.get("mp3_path"),
         entry.get("transcript_path"),
         entry.get("analysis_path"),
+        entry.get("caption_srt_path"),
+        entry.get("caption_vtt_path"),
+        entry.get("caption_txt_path"),
     ]
     for file_path_obj in files_to_delete:
         if pd.notna(file_path_obj) and str(file_path_obj).strip():
@@ -529,7 +680,7 @@ def handle_list_manifest(manifest_df):
     with pd.option_context(
         "display.max_colwidth", 50, "display.width", 1000, "display.max_rows", 25
     ):
-        cols_to_display = ["youtube_url", "base_filename", "status_video_downloaded", "status_mp3_converted", "status_transcript_generated", "status_analysis_generated"]
+        cols_to_display = ["youtube_url", "base_filename", "status_video_downloaded", "status_mp3_converted", "status_transcript_generated", "status_analysis_generated", "status_captions_generated"]
         # Filter out columns that might not exist to prevent errors
         cols_to_display = [col for col in cols_to_display if col in manifest_df.columns]
         if not cols_to_display:

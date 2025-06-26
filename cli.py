@@ -92,6 +92,21 @@ def parse_arguments():
         help="Gemini model for clip identification.",
     )
     process_parser.add_argument(
+        "--generate-captions",
+        action="store_true",
+        help="Generate caption files (.srt, .vtt, .txt) using OpenAI's Whisper.",
+    )
+    process_parser.add_argument(
+        "--whisper-model",
+        default="small",
+        help="Whisper model to use for caption generation (e.g., small, base, medium, large).",
+    )
+    process_parser.add_argument(
+        "--caption-dir",
+        default=None,
+        help="Directory for caption files (default: [OUTPUT]/captions).",
+    )
+    process_parser.add_argument(
         "--force",
         action="store_true",
         help="Force re-processing, ignoring cached files/statuses.",
@@ -140,6 +155,11 @@ def parse_arguments():
             os.path.abspath(args.analysis_dir)
             if args.analysis_dir
             else os.path.join(base_out, "viral_analysis")
+        )
+        args.effective_caption_dir = (
+            os.path.abspath(args.caption_dir)
+            if args.caption_dir
+            else os.path.join(base_out, "captions")
         )
 
     return args

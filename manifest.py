@@ -10,10 +10,14 @@ MANIFEST_COLUMNS = [
     "mp3_path",
     "transcript_path",
     "analysis_path",
+    "caption_srt_path",
+    "caption_vtt_path",
+    "caption_txt_path",
     "status_video_downloaded",
     "status_mp3_converted",
     "status_transcript_generated",
     "status_analysis_generated",
+    "status_captions_generated",
     "last_updated",
 ]
 DEFAULT_MANIFEST_FILE = "processing_manifest.csv"
@@ -61,6 +65,7 @@ def load_manifest(manifest_path):
                 "status_mp3_converted",
                 "status_transcript_generated",
                 "status_analysis_generated",
+                "status_captions_generated",
             ]
             for col_name in bool_status_cols:
                 if col_name in df.columns:
@@ -76,7 +81,7 @@ def load_manifest(manifest_path):
                 else:  # If column was just added
                     df[col_name] = pd.Series([pd.NA] * len(df), dtype=pd.BooleanDtype())
 
-            path_cols = ["video_path", "mp3_path", "transcript_path", "analysis_path"]
+            path_cols = ["video_path", "mp3_path", "transcript_path", "analysis_path", "caption_srt_path", "caption_vtt_path", "caption_txt_path"]
             for col_name in path_cols:
                 if col_name in df.columns:
                     df[col_name] = df[col_name].astype(pd.StringDtype())
