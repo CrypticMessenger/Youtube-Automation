@@ -17,6 +17,7 @@ from youtube_utils import (
 )
 from audio_processing import convert_to_mp3, generate_caption_files
 from gemini_interaction import transcribe_audio_gemini, identify_viral_clips_gemini
+from video_processing import burn_subtitles, generate_video_with_captions
 
 
 def process_youtube_url(args, manifest_df, manifest_path):
@@ -591,6 +592,70 @@ def process_youtube_url(args, manifest_df, manifest_path):
         entry = get_manifest_entry(manifest_df, canonical_url)
         save_manifest(manifest_df, manifest_path)
 
+    # --- 6. Burn Subtitles ---
+    burned_video_path_from_manifest = entry.get("burned_video_path")
+    burned_video_status_from_manifest = entry.get("status_burned_video_generated")
+
+    if args.burn_subtitles:
+        cached_burned_video_valid_and_present = False
+        if (
+            not force_processing
+            and burned_video_status_from_manifest == True
+            and pd.notna(burned_video_path_from_manifest)
+            and os.path.exists(str(burned_video_path_from_manifest))
+        ):
+            print(f"[CACHE] Using existing burned video from manifest: {burned_video_path_from_manifest}")
+            cached_burned_video_valid_and_present = True
+        
+        if not cached_burned_video_valid_and_present:
+            if burned_video_status_from_manifest == True and (
+                not pd.notna(burned_video_path_from_manifest)
+                or not os.path.exists(str(burned_video_path_from_manifest))
+            ):
+                print(
+                    f"[INFO] Burned video status was True, but file missing/path invalid. Re-generating for {base_name_for_paths}."
+                )
+            elif force_processing:
+                print(f"[INFO] Force processing burned video for {base_name_for_paths}.")
+
+            video_path = entry.get("video_path")
+            mp3_path = entry.get("mp3_path")
+            ass_path = entry.get("caption_ass_path")
+
+            if video_path and mp3_path and ass_path and os.path.exists(video_path) and os.path.exists(mp3_path) and os.path.exists(ass_path):
+                print("[INFO] Burning subtitles into video...")
+                os.makedirs(args.effective_burned_video_dir, exist_ok=True)
+                output_path = os.path.join(args.effective_burned_video_dir, base_name_for_paths + "_burned.mp4")
+                burned_path = burn_subtitles(
+                    video_path,
+                    mp3_path,
+                    ass_path,
+                    output_path,
+                )
+                if burned_path:
+                    manifest_df = update_manifest_entry(
+                        manifest_df,
+                        canonical_url,
+                        {
+                            "burned_video_path": os.path.abspath(burned_path),
+                            "status_burned_video_generated": True,
+                        },
+                    )
+                else:
+                    print(f"[ERROR] Subtitle burn failed for {canonical_url}.")
+                    manifest_df = update_manifest_entry(
+                        manifest_df,
+                        canonical_url,
+                        {
+                            "burned_video_path": pd.NA,
+                            "status_burned_video_generated": False,
+                        },
+                    )
+                entry = get_manifest_entry(manifest_df, canonical_url)
+                save_manifest(manifest_df, manifest_path)
+            else:
+                print("[WARNING] Video, audio, or ass file not available, skipping subtitle burn.")
+
     print(f"[INFO] Processing for {canonical_url} complete.")
     return manifest_df
 
@@ -633,6 +698,7 @@ def handle_remove_url(url_to_remove_input, manifest_df, manifest_path):
         entry.get("analysis_path"),
         entry.get("caption_srt_path"),
         entry.get("caption_ass_path"),
+        entry.get("burned_video_path"),
     ]
     for file_path_obj in files_to_delete:
         if pd.notna(file_path_obj) and str(file_path_obj).strip():
@@ -667,7 +733,7 @@ def handle_list_manifest(manifest_df):
     with pd.option_context(
         "display.max_colwidth", 50, "display.width", 1000, "display.max_rows", 25
     ):
-        cols_to_display = ["youtube_url", "base_filename", "status_video_downloaded", "status_mp3_converted", "status_transcript_generated", "status_analysis_generated", "status_captions_generated"]
+        cols_to_display = ["youtube_url", "base_filename", "status_video_downloaded", "status_mp3_converted", "status_transcript_generated", "status_analysis_generated", "status_captions_generated", "status_burned_video_generated"]
         # Filter out columns that might not exist to prevent errors
         cols_to_display = [col for col in cols_to_display if col in manifest_df.columns]
         if not cols_to_display:
@@ -676,4 +742,45 @@ def handle_list_manifest(manifest_df):
             print(manifest_df[cols_to_display].head(20).to_string())
 
     print(f"--- Total entries: {len(manifest_df)} ---")
-    print("--- End of Manifest List ---\n")
+    print("--- End of Manifest List ---")
+
+def handle_generate_video(args, manifest_df):
+    yt_obj, canonical_url = get_yt_object_and_canonical_url(args.url)
+    if not yt_obj:
+        print(f"[ERROR] Could not process URL: {args.url}")
+        return
+
+    entry = get_manifest_entry(manifest_df, canonical_url)
+    if entry is None:
+        print(f"[ERROR] No manifest entry found for URL: {canonical_url}")
+        print("        Please process the video first using the 'process' command.")
+        return
+
+    base_name = entry.get("base_filename")
+    video_path = entry.get("video_path")
+    mp3_path = entry.get("mp3_path")
+    ass_path = entry.get("caption_ass_path")
+
+    if not all([base_name, video_path, mp3_path, ass_path]):
+        print("[ERROR] Manifest entry is missing required data (base_filename, video_path, mp3_path, or ass_path).")
+        return
+
+    if not os.path.exists(video_path):
+        print(f"[ERROR] Video file not found at path: {video_path}")
+        return
+    if not os.path.exists(mp3_path):
+        print(f"[ERROR] Audio file not found at path: {mp3_path}")
+        return
+    if not os.path.exists(ass_path):
+        print(f"[ERROR] ASS caption file not found at path: {ass_path}")
+        return
+
+    # Create the output directory
+    output_dir = os.path.join(os.getcwd(), "captioned_videos")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Construct the output path
+    output_filename = f"{base_name}_captioned.mp4"
+    output_path = os.path.join(output_dir, output_filename)
+
+    generate_video_with_captions(video_path, mp3_path, ass_path, output_path)

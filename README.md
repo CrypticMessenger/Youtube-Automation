@@ -55,7 +55,7 @@ This project provides a command-line toolkit to download, process, and analyze Y
 
 ## Usage
 
-The script `main.py` is the entry point for all operations. It has two main subcommands: `process` and `manage`.
+The script `main.py` is the entry point for all operations. It has two main subcommands: `process`, `manage` and `generate`.
 
 ### `process` Command
 
@@ -135,6 +135,29 @@ python3 main.py manage <action> [options]
     ```bash
     python3 main.py manage remove "https://www.youtube.com/watch?v=some_old_video_id"
     ```
+
+### `generate` Command
+
+Use the `generate` command to create a video with hardcoded captions, using the data stored in the manifest. The output video will be saved in the `captioned_videos` directory with a `_captioned.mp4` suffix.
+
+**Syntax**:
+
+```bash
+python3 main.py generate <youtube_url>
+```
+
+**Arguments & Options**:
+
+*   `url`: (Required) The YouTube video URL. This must match an entry in the manifest that has already been processed with the `--generate-captions` flag.
+
+**Example**:
+
+1.  **Generate a video with captions**:
+    First, ensure the video has been processed (e.g., with `--generate-captions`). Then, run:
+    ```bash
+    python3 main.py generate "https://www.youtube.com/watch?v=your_video_id"
+    ```
+    This will create a file in the `captioned_videos` directory with a name like `your_video_title_captioned.mp4`.
 
 **Options for `manage` command**:
 *   `--manifest-file <path>`: Path to the processing manifest CSV file (default: `processing_manifest.csv`).

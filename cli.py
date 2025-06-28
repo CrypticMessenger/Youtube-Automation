@@ -107,6 +107,16 @@ def parse_arguments():
         help="Directory for caption files (default: [OUTPUT]/captions).",
     )
     process_parser.add_argument(
+        "--burn-subtitles",
+        action="store_true",
+        help="Burn .ass subtitles into the video. Requires --generate-captions.",
+    )
+    process_parser.add_argument(
+        "--burned-video-dir",
+        default=None,
+        help="Directory for videos with burned subtitles (default: [OUTPUT]/burned_videos)",
+    )
+    process_parser.add_argument(
         "--force",
         action="store_true",
         help="Force re-processing, ignoring cached files/statuses.",
@@ -126,10 +136,16 @@ def parse_arguments():
         "remove", help="Remove a URL and its files from manifest"
     )
     remove_parser.add_argument("url", help="YouTube URL to remove")
-    list_parser = manage_subparsers.add_parser( # noqa: F841 -- assigned but not used directly, but needed for argparser
+    list_parser = manage_subparsers.add_parser(  # noqa: F841 -- assigned but not used directly, but needed for argparser
         "list", help="List all entries in the manifest"
     )
     # The 'list' sub-command itself doesn't take additional arguments beyond the global ones like --manifest-file.
+
+    # --- Generate Command ---
+    generate_parser = subparsers.add_parser(
+        "generate", help="Generate a video with hardcoded captions from manifest data"
+    )
+    generate_parser.add_argument("url", help="YouTube video URL from manifest")
 
     args = parser.parse_args()
 
@@ -160,6 +176,11 @@ def parse_arguments():
             os.path.abspath(args.caption_dir)
             if args.caption_dir
             else os.path.join(base_out, "captions")
+        )
+        args.effective_burned_video_dir = (
+            os.path.abspath(args.burned_video_dir)
+            if args.burned_video_dir
+            else os.path.join(base_out, "burned_videos")
         )
 
     return args

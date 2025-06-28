@@ -2,7 +2,9 @@ audios/*
 transcripts/*
 videos/*
 captions/*
+captioned_videos/*
 viral_analysis/*
 .env
 __pycache__
 processing_manifest.csv
+.DS_Store

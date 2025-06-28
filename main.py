@@ -7,7 +7,12 @@ import os # For os.environ.get in main()
 import os
 
 # Local application imports
-from orchestrator import process_youtube_url, handle_remove_url, handle_list_manifest
+from orchestrator import (
+    process_youtube_url,
+    handle_remove_url,
+    handle_list_manifest,
+    handle_generate_video,
+)
 from cli import parse_arguments
 from manifest import load_manifest # save_manifest is now handled by orchestrator/handlers
 
@@ -43,6 +48,9 @@ def main():
         elif args.manage_action == "list":
             handle_list_manifest(manifest_df)
             # list command does not modify the manifest, so no save operation.
+
+    elif args.command_name == "generate":
+        handle_generate_video(args, manifest_df)
 
         # Other manage actions might require saving, but should be handled by their respective functions.
 
