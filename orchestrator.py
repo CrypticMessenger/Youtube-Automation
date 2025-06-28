@@ -478,8 +478,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
 
     # --- 5. Caption Generation ---
     caption_srt_path_from_manifest = entry.get("caption_srt_path")
-    caption_vtt_path_from_manifest = entry.get("caption_vtt_path")
-    caption_txt_path_from_manifest = entry.get("caption_txt_path")
+    caption_ass_path_from_manifest = entry.get("caption_ass_path")
     caption_status_from_manifest = entry.get("status_captions_generated")
 
     if args.generate_captions:
@@ -491,23 +490,19 @@ def process_youtube_url(args, manifest_df, manifest_path):
             and caption_status_from_manifest == True
             and pd.notna(caption_srt_path_from_manifest)
             and os.path.exists(str(caption_srt_path_from_manifest))
-            and pd.notna(caption_vtt_path_from_manifest)
-            and os.path.exists(str(caption_vtt_path_from_manifest))
-            and pd.notna(caption_txt_path_from_manifest)
-            and os.path.exists(str(caption_txt_path_from_manifest))
+            and pd.notna(caption_ass_path_from_manifest)
+            and os.path.exists(str(caption_ass_path_from_manifest))
         ):
             print(f"[CACHE] Using existing captions from manifest: {caption_srt_path_from_manifest}, etc.")
             cached_captions_valid_and_present = True
         else:
             # Fallback to check expected paths
             expected_srt_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".srt")
-            expected_vtt_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".vtt")
-            expected_txt_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".txt")
+            expected_ass_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".ass")
             if (
                 not force_processing and
                 os.path.exists(expected_srt_path) and
-                os.path.exists(expected_vtt_path) and
-                os.path.exists(expected_txt_path)
+                os.path.exists(expected_ass_path)
             ):
                 print(f"[CACHE] Found existing caption files at expected paths, updating manifest: {args.effective_caption_dir}")
                 manifest_df = update_manifest_entry(
@@ -515,8 +510,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                     canonical_url,
                     {
                         "caption_srt_path": os.path.abspath(expected_srt_path),
-                        "caption_vtt_path": os.path.abspath(expected_vtt_path),
-                        "caption_txt_path": os.path.abspath(expected_txt_path),
+                        "caption_ass_path": os.path.abspath(expected_ass_path),
                         "status_captions_generated": True,
                     },
                 )
@@ -528,10 +522,8 @@ def process_youtube_url(args, manifest_df, manifest_path):
             if caption_status_from_manifest == True and (
                 not pd.notna(caption_srt_path_from_manifest)
                 or not os.path.exists(str(caption_srt_path_from_manifest))
-                or not pd.notna(caption_vtt_path_from_manifest)
-                or not os.path.exists(str(caption_vtt_path_from_manifest))
-                or not pd.notna(caption_txt_path_from_manifest)
-                or not os.path.exists(str(caption_txt_path_from_manifest))
+                or not pd.notna(caption_ass_path_from_manifest)
+                or not os.path.exists(str(caption_ass_path_from_manifest))
             ):
                 print(
                     f"[INFO] Caption status was True, but files missing/path invalid. Re-generating captions for {base_name_for_paths}."
@@ -555,8 +547,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                         canonical_url,
                         {
                             "caption_srt_path": os.path.abspath(caption_paths["srt"]),
-                            "caption_vtt_path": os.path.abspath(caption_paths["vtt"]),
-                            "caption_txt_path": os.path.abspath(caption_paths["txt"]),
+                            "caption_ass_path": os.path.abspath(caption_paths["ass"]),
                             "status_captions_generated": True,
                         },
                     )
@@ -567,8 +558,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                         canonical_url,
                         {
                             "caption_srt_path": pd.NA,
-                            "caption_vtt_path": pd.NA,
-                            "caption_txt_path": pd.NA,
+                            "caption_ass_path": pd.NA,
                             "status_captions_generated": False,
                         },
                     )
@@ -582,8 +572,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                     canonical_url,
                     {
                         "caption_srt_path": pd.NA,
-                        "caption_vtt_path": pd.NA,
-                        "caption_txt_path": pd.NA,
+                        "caption_ass_path": pd.NA,
                         "status_captions_generated": False,
                     },
                 )
@@ -595,8 +584,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
             canonical_url,
             {
                 "caption_srt_path": pd.NA,
-                "caption_vtt_path": pd.NA,
-                "caption_txt_path": pd.NA,
+                "caption_ass_path": pd.NA,
                 "status_captions_generated": False,
             },
         )
@@ -644,8 +632,7 @@ def handle_remove_url(url_to_remove_input, manifest_df, manifest_path):
         entry.get("transcript_path"),
         entry.get("analysis_path"),
         entry.get("caption_srt_path"),
-        entry.get("caption_vtt_path"),
-        entry.get("caption_txt_path"),
+        entry.get("caption_ass_path"),
     ]
     for file_path_obj in files_to_delete:
         if pd.notna(file_path_obj) and str(file_path_obj).strip():

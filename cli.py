@@ -94,12 +94,12 @@ def parse_arguments():
     process_parser.add_argument(
         "--generate-captions",
         action="store_true",
-        help="Generate caption files (.srt, .vtt, .txt) using OpenAI's Whisper.",
+        help="Generate caption files (.srt, .ass) using stable-whisper.",
     )
     process_parser.add_argument(
         "--whisper-model",
-        default="small",
-        help="Whisper model to use for caption generation (e.g., small, base, medium, large).",
+        default="tiny",
+        help="Whisper model to use for caption generation (e.g., tiny, small, base, medium, large).",
     )
     process_parser.add_argument(
         "--caption-dir",

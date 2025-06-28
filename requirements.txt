@@ -2,4 +2,4 @@ protobuf==6.31.1
 pytubefix==9.2.0
 google-generativeai
 pandas
-openai-whisper
+stable-ts

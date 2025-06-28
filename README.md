@@ -83,7 +83,7 @@ python3 main.py process <youtube_url> [options]
 *   `--viral-short-identifier`: Identify potential viral short clips from the transcript. (Requires `GOOGLE_API_KEY`).
 *   `--number-of-sections <count>`: Number of viral sections for the AI to find (e.g., `3`, `5`).
 *   `--clip-identifier-model <model_name>`: Gemini model for clip identification (default: `gemini-2.5-flash`).
-*   `--generate-captions`: Generate caption files (.srt, .vtt, .txt) using OpenAI's Whisper. Requires `openai-whisper` to be installed.
+*   `--generate-captions`: Generate caption files (.srt, .ass) using `stable-whisper`.
 *   `--whisper-model <model_name>`: Whisper model to use for caption generation (e.g., `small`, `base`, `medium`, `large`). Defaults to `small`.
 *   `--caption-dir <directory>`: Specific directory for caption files (default: `<output_dir>/captions`).
 *   `--force`: Force re-processing of all steps, ignoring any cached files or statuses in the manifest.
