@@ -162,6 +162,43 @@ python3 main.py generate <youtube_url>
 **Options for `manage` command**:
 *   `--manifest-file <path>`: Path to the processing manifest CSV file (default: `processing_manifest.csv`).
 
+### Processing a New YouTube Video
+
+To process a brand new YouTube video from start to finish, including downloading, transcribing, identifying viral clips, generating captions, and creating a captioned video, follow these steps:
+
+1.  **Process the video with transcription, viral clip identification, and caption generation**:
+    This command will download the video, transcribe its audio, identify potential viral sections, and generate caption files. Replace `"https://www.youtube.com/watch?v=your_video_id"` with the actual YouTube URL and adjust the `--output` directory as needed.
+
+    ```bash
+    python3 main.py process "https://www.youtube.com/watch?v=your_video_id" \
+        --output "./processed_videos" \
+        --transcribe \
+        --viral-short-identifier \
+        --number-of-sections 3 \
+        --generate-captions
+    ```
+
+    **Expected Results**:
+    *   **Video File**: The downloaded video will be saved in `./processed_videos/videos/` (e.g., `your_video_title.mp4`).
+    *   **Audio File**: The extracted audio will be in `./processed_videos/audios/` (e.g., `your_video_title.mp3`).
+    *   **Transcript File**: The transcript will be in `./processed_videos/transcripts/` (e.g., `your_video_title.txt`).
+    *   **Viral Analysis**: The viral clip analysis will be in `./processed_videos/viral_analysis/` (e.g., `your_video_title_viral_analysis.json`).
+    *   **Caption Files**: The generated `.srt` and `.ass` caption files will be in `./processed_videos/captions/` (e.g., `your_video_title.srt`, `your_video_title.ass`).
+    *   **Manifest Entry**: An entry for this video will be added to `processing_manifest.csv`.
+
+2.  **Generate the captioned video**:
+    Once the processing in step 1 is complete, you can generate a new video with hardcoded captions using the `generate` command.
+
+    ```bash
+    python3 main.py generate "https://www.youtube.com/watch?v=your_video_id"
+    ```
+
+    **Expected Results**:
+    *   **Captioned Video File**: The final video with hardcoded captions will be saved in the `captioned_videos/` directory at the project root (e.g., `captioned_videos/your_video_title_captioned.mp4`).
+
+    You can find all generated files in their respective directories as specified above, relative to your chosen `--output` directory (or the current directory if not specified). The `processing_manifest.csv` file will keep a record of all processed URLs and their associated file paths.
+
+
 
 ## Implementation Plan / TODOs
 

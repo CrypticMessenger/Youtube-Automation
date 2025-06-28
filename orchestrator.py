@@ -81,7 +81,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
     if not args.audio: # Not in audio-only mode
         if (
             not force_processing
-            and video_status_from_manifest == True
+            and video_status_from_manifest is True # Explicitly check for True
             and pd.notna(video_download_path_from_manifest)
             and str(video_download_path_from_manifest).strip()
             and os.path.exists(str(video_download_path_from_manifest))
@@ -89,7 +89,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
             print(f"[CACHE] Using existing video: {video_download_path_from_manifest}")
             video_download_path_to_use = str(video_download_path_from_manifest)
         else:
-            if video_status_from_manifest == True and (
+            if video_status_from_manifest is True and (
                 not pd.notna(video_download_path_from_manifest)
                 or not str(video_download_path_from_manifest).strip()
                 or not os.path.exists(str(video_download_path_from_manifest))
@@ -126,7 +126,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
             save_manifest(manifest_df, manifest_path)
     else:  # audio-only mode
         video_download_path_to_use = None # Ensure it's None
-        if video_status_from_manifest != False or pd.notna(video_download_path_from_manifest):
+        if video_status_from_manifest is not False or pd.notna(video_download_path_from_manifest):
             manifest_df = update_manifest_entry(
                 manifest_df,
                 canonical_url,
@@ -147,7 +147,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
         # Default to manifest path if valid
         if (
             not force_processing
-            and mp3_status_from_manifest == True
+            and mp3_status_from_manifest is True
             and pd.notna(mp3_path_from_manifest)
             and str(mp3_path_from_manifest).strip()
             and os.path.exists(str(mp3_path_from_manifest))
@@ -173,7 +173,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
 
         # If after all checks, we still don't have a file, generate it.
         if not mp3_file_for_processing:
-            if mp3_status_from_manifest == True and (
+            if mp3_status_from_manifest is True and (
                 not pd.notna(mp3_path_from_manifest)
                 or not str(mp3_path_from_manifest).strip()
                 or not os.path.exists(str(mp3_path_from_manifest))
@@ -237,14 +237,15 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 entry = get_manifest_entry(manifest_df, canonical_url)
             save_manifest(manifest_df, manifest_path)
 
-    elif mp3_status_from_manifest != False or pd.notna(mp3_path_from_manifest): # If not needed, but manifest had info
-        manifest_df = update_manifest_entry(
-            manifest_df,
-            canonical_url,
-            {"mp3_path": pd.NA, "status_mp3_converted": False},
-        )
-        entry = get_manifest_entry(manifest_df, canonical_url)
-        save_manifest(manifest_df, manifest_path)
+    else: # If MP3 processing is not needed
+        if mp3_status_from_manifest is not False or pd.notna(mp3_path_from_manifest): # If not needed, but manifest had info
+            manifest_df = update_manifest_entry(
+                manifest_df,
+                canonical_url,
+                {"mp3_path": pd.NA, "status_mp3_converted": False},
+            )
+            entry = get_manifest_entry(manifest_df, canonical_url)
+            save_manifest(manifest_df, manifest_path)
 
     # --- 3. Transcription ---
     transcript_content = None # Store content if loaded or generated
@@ -257,7 +258,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
         if mp3_file_for_processing and os.path.exists(mp3_file_for_processing):
             if (
                 not force_processing
-                and transcript_status_from_manifest == True
+                and transcript_status_from_manifest is True
                 and pd.notna(transcript_path_from_manifest)
                 and str(transcript_path_from_manifest).strip()
                 and os.path.exists(str(transcript_path_from_manifest))
@@ -297,7 +298,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                     entry = get_manifest_entry(manifest_df, canonical_url)
 
             if transcript_content is None: # Process if not loaded from cache or cache was invalid/empty
-                if transcript_status_from_manifest == True and (
+                if transcript_status_from_manifest is True and (
                     not pd.notna(transcript_path_from_manifest)
                     or not str(transcript_path_from_manifest).strip()
                     or not os.path.exists(str(transcript_path_from_manifest))
@@ -355,7 +356,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
             print(
                 "[WARNING] MP3 not available or path invalid, skipping transcription."
             )
-            if transcript_status_from_manifest != False or pd.notna(transcript_path_from_manifest):
+            if transcript_status_from_manifest is not False or pd.notna(transcript_path_from_manifest):
                 manifest_df = update_manifest_entry(
                     manifest_df,
                     canonical_url,
@@ -363,14 +364,15 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 )
                 entry = get_manifest_entry(manifest_df, canonical_url)
                 save_manifest(manifest_df, manifest_path)
-    elif transcript_status_from_manifest != False or pd.notna(transcript_path_from_manifest):
-        manifest_df = update_manifest_entry(
-            manifest_df,
-            canonical_url,
-            {"transcript_path": pd.NA, "status_transcript_generated": False},
-        )
-        entry = get_manifest_entry(manifest_df, canonical_url)
-        save_manifest(manifest_df, manifest_path)
+    else: # If transcription is not needed
+        if transcript_status_from_manifest is not False or pd.notna(transcript_path_from_manifest):
+            manifest_df = update_manifest_entry(
+                manifest_df,
+                canonical_url,
+                {"transcript_path": pd.NA, "status_transcript_generated": False},
+            )
+            entry = get_manifest_entry(manifest_df, canonical_url)
+            save_manifest(manifest_df, manifest_path)
 
 
     # --- 4. Viral Clip Analysis ---
@@ -382,7 +384,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
         cached_analysis_valid_and_present = False
         if (
             not force_processing
-            and analysis_status_from_manifest == True
+            and analysis_status_from_manifest is True
             and pd.notna(analysis_path_from_manifest)
             and str(analysis_path_from_manifest).strip()
             and os.path.exists(str(analysis_path_from_manifest))
@@ -409,7 +411,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
 
         if transcript_content and transcript_content.strip(): # Check if we have transcript content
             if not cached_analysis_valid_and_present:
-                if analysis_status_from_manifest == True and (
+                if analysis_status_from_manifest is True and (
                      not pd.notna(analysis_path_from_manifest)
                     or not str(analysis_path_from_manifest).strip()
                     or not os.path.exists(str(analysis_path_from_manifest))
@@ -460,7 +462,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
             print(
                 "[WARNING] Transcript not available or empty, skipping viral clip analysis."
             )
-            if analysis_status_from_manifest != False or pd.notna(analysis_path_from_manifest):
+            if analysis_status_from_manifest is not False or pd.notna(analysis_path_from_manifest):
                 manifest_df = update_manifest_entry(
                     manifest_df,
                     canonical_url,
@@ -468,14 +470,15 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 )
                 entry = get_manifest_entry(manifest_df, canonical_url)
                 save_manifest(manifest_df, manifest_path)
-    elif analysis_status_from_manifest != False or pd.notna(analysis_path_from_manifest):
-        manifest_df = update_manifest_entry(
-            manifest_df,
-            canonical_url,
-            {"analysis_path": pd.NA, "status_analysis_generated": False},
-        )
-        entry = get_manifest_entry(manifest_df, canonical_url)
-        save_manifest(manifest_df, manifest_path)
+    else: # If viral short identification is not needed
+        if analysis_status_from_manifest is not False or pd.notna(analysis_path_from_manifest):
+            manifest_df = update_manifest_entry(
+                manifest_df,
+                canonical_url,
+                {"analysis_path": pd.NA, "status_analysis_generated": False},
+            )
+            entry = get_manifest_entry(manifest_df, canonical_url)
+            save_manifest(manifest_df, manifest_path)
 
     # --- 5. Caption Generation ---
     caption_srt_path_from_manifest = entry.get("caption_srt_path")
@@ -488,7 +491,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
         # Default to manifest path if valid
         if (
             not force_processing
-            and caption_status_from_manifest == True
+            and caption_status_from_manifest is True
             and pd.notna(caption_srt_path_from_manifest)
             and os.path.exists(str(caption_srt_path_from_manifest))
             and pd.notna(caption_ass_path_from_manifest)
@@ -520,7 +523,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 cached_captions_valid_and_present = True
 
         if not cached_captions_valid_and_present:
-            if caption_status_from_manifest == True and (
+            if caption_status_from_manifest is True and (
                 not pd.notna(caption_srt_path_from_manifest)
                 or not os.path.exists(str(caption_srt_path_from_manifest))
                 or not pd.notna(caption_ass_path_from_manifest)
@@ -567,7 +570,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 save_manifest(manifest_df, manifest_path)
         else:
             print("[WARNING] MP3 not available or path invalid, skipping caption generation.")
-            if caption_status_from_manifest != False or pd.notna(caption_srt_path_from_manifest):
+            if caption_status_from_manifest is not False or pd.notna(caption_srt_path_from_manifest):
                 manifest_df = update_manifest_entry(
                     manifest_df,
                     canonical_url,
@@ -579,18 +582,19 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 )
                 entry = get_manifest_entry(manifest_df, canonical_url)
                 save_manifest(manifest_df, manifest_path)
-    elif caption_status_from_manifest != False or pd.notna(caption_srt_path_from_manifest):
-        manifest_df = update_manifest_entry(
-            manifest_df,
-            canonical_url,
-            {
-                "caption_srt_path": pd.NA,
-                "caption_ass_path": pd.NA,
-                "status_captions_generated": False,
-            },
-        )
-        entry = get_manifest_entry(manifest_df, canonical_url)
-        save_manifest(manifest_df, manifest_path)
+    else: # If caption generation is not needed
+        if caption_status_from_manifest is not False or pd.notna(caption_srt_path_from_manifest):
+            manifest_df = update_manifest_entry(
+                manifest_df,
+                canonical_url,
+                {
+                    "caption_srt_path": pd.NA,
+                    "caption_ass_path": pd.NA,
+                    "status_captions_generated": False,
+                },
+            )
+            entry = get_manifest_entry(manifest_df, canonical_url)
+            save_manifest(manifest_df, manifest_path)
 
     # --- 6. Burn Subtitles ---
     burned_video_path_from_manifest = entry.get("burned_video_path")
@@ -600,15 +604,16 @@ def process_youtube_url(args, manifest_df, manifest_path):
         cached_burned_video_valid_and_present = False
         if (
             not force_processing
-            and burned_video_status_from_manifest == True
+            and burned_video_status_from_manifest is True
             and pd.notna(burned_video_path_from_manifest)
+            and str(burned_video_path_from_manifest).strip()
             and os.path.exists(str(burned_video_path_from_manifest))
         ):
             print(f"[CACHE] Using existing burned video from manifest: {burned_video_path_from_manifest}")
             cached_burned_video_valid_and_present = True
         
         if not cached_burned_video_valid_and_present:
-            if burned_video_status_from_manifest == True and (
+            if burned_video_status_from_manifest is True and (
                 not pd.notna(burned_video_path_from_manifest)
                 or not os.path.exists(str(burned_video_path_from_manifest))
             ):
@@ -655,6 +660,15 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 save_manifest(manifest_df, manifest_path)
             else:
                 print("[WARNING] Video, audio, or ass file not available, skipping subtitle burn.")
+    else: # If burning subtitles is not needed
+        if burned_video_status_from_manifest is not False or pd.notna(burned_video_path_from_manifest):
+            manifest_df = update_manifest_entry(
+                manifest_df,
+                canonical_url,
+                {"burned_video_path": pd.NA, "status_burned_video_generated": False},
+            )
+            entry = get_manifest_entry(manifest_df, canonical_url)
+            save_manifest(manifest_df, manifest_path)
 
     print(f"[INFO] Processing for {canonical_url} complete.")
     return manifest_df
@@ -760,6 +774,12 @@ def handle_generate_video(args, manifest_df):
     video_path = entry.get("video_path")
     mp3_path = entry.get("mp3_path")
     ass_path = entry.get("caption_ass_path")
+
+    # Convert pd.NA to None for boolean evaluation in all()
+    base_name = None if pd.isna(base_name) else base_name
+    video_path = None if pd.isna(video_path) else video_path
+    mp3_path = None if pd.isna(mp3_path) else mp3_path
+    ass_path = None if pd.isna(ass_path) else ass_path
 
     if not all([base_name, video_path, mp3_path, ass_path]):
         print("[ERROR] Manifest entry is missing required data (base_filename, video_path, mp3_path, or ass_path).")
