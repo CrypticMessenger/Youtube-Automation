@@ -16,7 +16,7 @@ from youtube_utils import (
     get_yt_object_and_canonical_url,
 )
 from audio_processing import convert_to_mp3, generate_caption_files
-from gemini_interaction import transcribe_audio_gemini, identify_viral_clips_gemini
+from gemini_interaction import identify_viral_clips_gemini
 from audio_processing import transcribe_audio_stable_ts
 from video_processing import burn_subtitles, generate_video_with_captions
 
@@ -49,7 +49,6 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 f"[CRITICAL_ERROR] Failed to create or retrieve new manifest entry for {canonical_url}. Aborting processing for this URL."
             )
             return manifest_df
-    # No specific logging if entry is found, it's the normal path.
 
     manifest_base_name = entry.get("base_filename")
     if pd.isna(manifest_base_name) or not str(manifest_base_name).strip():
@@ -254,15 +253,10 @@ def process_youtube_url(args, manifest_df, manifest_path):
     transcript_status_from_manifest = entry.get("status_transcript_generated")
     needs_transcription = args.transcribe or args.viral_short_identifier
 
-    # Determine which transcription method to use
-    use_stable_ts_transcribe = args.transcribe and not args.viral_short_identifier
-    use_gemini_transcribe = args.viral_short_identifier
-
     # Cache check logic for transcription.
     if needs_transcription:
         if mp3_file_for_processing and os.path.exists(mp3_file_for_processing):
             cached_transcript_valid_and_present = False
-            should_transcribe = False
             should_transcribe = False
             if (
                 not force_processing
@@ -307,7 +301,6 @@ def process_youtube_url(args, manifest_df, manifest_path):
                     )
                     entry = get_manifest_entry(manifest_df, canonical_url)
 
-            should_transcribe = False
             if not cached_transcript_valid_and_present:
                 if transcript_status_from_manifest is True and (
                     not pd.notna(transcript_path_from_manifest)
@@ -329,65 +322,26 @@ def process_youtube_url(args, manifest_df, manifest_path):
             if should_transcribe:
                 print("[INFO] Performing audio transcription...")
                 os.makedirs(args.effective_transcript_dir, exist_ok=True)
-                if args.transcribe:
-                    print("[INFO] Performing stable-ts audio transcription...")
-                    new_transcript_path = transcribe_audio_stable_ts(
-                        mp3_file_for_processing,
-                        args.effective_transcript_dir,
-                        base_name_for_paths,
-                        args.whisper_model,
-                    )
-                    if new_transcript_path and os.path.exists(new_transcript_path):
-                        with open(new_transcript_path, "r", encoding="utf-8") as f:
-                            transcript_content = f.read()
-                        manifest_df = update_manifest_entry(
-                            manifest_df,
-                            canonical_url,
-                            {
-                                "transcript_path": os.path.abspath(new_transcript_path),
-                                "status_transcript_generated": True,
-                            },
-                        )
-                    else:
-                        transcript_content = None
-                        manifest_df = update_manifest_entry(
-                            manifest_df,
-                            canonical_url,
-                            {
-                                "transcript_path": pd.NA,
-                                "status_transcript_generated": False,
-                            },
-                        )
-                    entry = get_manifest_entry(manifest_df, canonical_url)
-                    save_manifest(manifest_df, manifest_path)
-                elif args.viral_short_identifier:
-                    print("[INFO] Performing Gemini audio transcription for viral clip identification...")
-                    transcription_result = transcribe_audio_gemini(
-                        mp3_file_for_processing,
-                        args.effective_transcript_dir,
-                        base_name_for_paths,
-                        args.gemini_model,
-                        save_transcript_file=True,
-                    )
-                    transcript_content = transcription_result["text"]
-                    new_transcript_path = (
-                        os.path.abspath(transcription_result["path"])
-                        if transcription_result["path"] and os.path.exists(transcription_result["path"])
-                        else pd.NA
-                    )
+                print("[INFO] Performing stable-ts audio transcription...")
+                new_transcript_path = transcribe_audio_stable_ts(
+                    mp3_file_for_processing,
+                    args.effective_transcript_dir,
+                    base_name_for_paths,
+                    args.whisper_model,
+                )
+                if new_transcript_path and os.path.exists(new_transcript_path):
+                    with open(new_transcript_path, "r", encoding="utf-8") as f:
+                        transcript_content = f.read()
                     manifest_df = update_manifest_entry(
                         manifest_df,
                         canonical_url,
                         {
-                            "transcript_path": new_transcript_path,
-                            "status_transcript_generated": (
-                                True
-                                if pd.notna(new_transcript_path) and transcript_content.strip() # Status True only if path valid AND content exists
-                                else False
-                            ),
+                            "transcript_path": os.path.abspath(new_transcript_path),
+                            "status_transcript_generated": True,
                         },
                     )
-                else: # Transcription failed (returned None for text)
+                else:
+                    transcript_content = None
                     manifest_df = update_manifest_entry(
                         manifest_df,
                         canonical_url,

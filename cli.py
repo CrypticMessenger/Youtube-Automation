@@ -71,11 +71,6 @@ def parse_arguments():
         help="Transcribe audio and save .txt transcript. (Uses stable-ts)",
     )
     process_parser.add_argument(
-        "--gemini-model",
-        default="gemini-1.5-flash-latest",
-        help="Gemini model for transcription.",
-    )
-    process_parser.add_argument(
         "--viral-short-identifier",
         action="store_true",
         help="Identify viral short clips from transcript.",
