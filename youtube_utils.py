@@ -20,15 +20,13 @@ def get_video_info(url):
         print(f"[ERROR] Could not fetch YouTube video details for {url}: {e}")
         return None
 
-def download_video(video_info, base_name_for_paths, effective_video_dir, resolution_arg):
+def download_video(video_info, base_name_for_paths, effective_video_dir, video_quality_arg):
     """Downloads the video stream using yt-dlp."""
     video_url = video_info['webpage_url']
     video_filename = f"{base_name_for_paths}.mp4"
     output_path = os.path.join(effective_video_dir, video_filename)
     
-    format_selector = f"bestvideo[height<={resolution_arg[:-1]}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-    if resolution_arg == 'highest':
-        format_selector = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+    format_selector = video_quality_arg
 
     ydl_opts = {
         'format': format_selector,
@@ -45,14 +43,14 @@ def download_video(video_info, base_name_for_paths, effective_video_dir, resolut
         print(f"[ERROR] Video download failed for {base_name_for_paths}: {e}")
         return None
 
-def download_audio_stream(video_info, base_name_for_paths, effective_audio_dir):
+def download_audio_stream(video_info, base_name_for_paths, effective_audio_dir, audio_quality_arg):
     """Downloads a dedicated audio stream using yt-dlp."""
     video_url = video_info['webpage_url']
     temp_audio_filename = f"{base_name_for_paths}_audiotemp.m4a"
     output_path = os.path.join(effective_audio_dir, temp_audio_filename)
 
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio',
+        'format': audio_quality_arg,
         'outtmpl': output_path,
         'quiet': True,
     }

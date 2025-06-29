@@ -107,7 +107,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
             else:
                 print(f"[INFO] Attempting to download video: {base_name_for_paths}")
 
-            downloaded_path = download_video(video_info, base_name_for_paths, args.effective_video_dir, args.resolution)
+            downloaded_path = download_video(video_info, base_name_for_paths, args.effective_video_dir, args.video_quality)
 
             if downloaded_path:
                 video_download_path_to_use = downloaded_path
@@ -201,7 +201,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 source_for_ffmpeg = video_download_path_to_use
             else: # Audio-only mode, or video download failed/skipped
                 print("[INFO] Attempting to download dedicated audio stream for MP3 conversion...")
-                raw_audio_input_path = download_audio_stream(video_info, base_name_for_paths, args.effective_audio_dir)
+                raw_audio_input_path = download_audio_stream(video_info, base_name_for_paths, args.effective_audio_dir, args.audio_quality)
                 if raw_audio_input_path:
                     source_for_ffmpeg = raw_audio_input_path
                 else:

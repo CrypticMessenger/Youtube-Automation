@@ -34,10 +34,14 @@ def parse_arguments():
         help="Custom base filename (no extension). Defaults to video title.",
     )
     process_parser.add_argument(
-        "-r",
-        "--resolution",
-        default="highest",
-        help="Video resolution (e.g., 720p, highest)",
+        "--video-quality",
+        default="best",
+        help="Video quality/format selection for yt-dlp (e.g., 'best', 'bestvideo[height<=720]').",
+    )
+    process_parser.add_argument(
+        "--audio-quality",
+        default="bestaudio",
+        help="Audio quality/format selection for yt-dlp (e.g., 'bestaudio', 'bestaudio[ext=m4a]').",
     )
     process_parser.add_argument(
         "-a",

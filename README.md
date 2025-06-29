@@ -76,7 +76,8 @@ python3 main.py process <youtube_url> [options]
 - `url`: (Required) The YouTube video URL to process.
 - `-o, --output <directory>`: Base output directory for all generated files (default: current directory).
 - `-f, --filename <name>`: Custom base filename (no extension) for downloaded files. Defaults to a sanitized version of the video title.
-- `-r, --resolution <res>`: Video resolution (e.g., `720p`, `1080p`, `highest`). Defaults to `highest`.
+- `--video-quality <yt-dlp_format_string>`: Video quality/format selection for `yt-dlp`. Defaults to `best`. Examples: `bestvideo[height<=720][ext=mp4]`, `best`.
+- `--audio-quality <yt-dlp_format_string>`: Audio quality/format selection for `yt-dlp`. Defaults to `bestaudio`. Examples: `bestaudio[ext=m4a]`, `bestaudio`.
 - `-a, --audio`: Download audio-only (MP3 format). If specified, no video file will be downloaded.
 - `--audio-dir <directory>`: Specific directory for audio files (default: `<output_dir>/audios`).
 - `--video-dir <directory>`: Specific directory for video files (default: `<output_dir>/videos`).
@@ -219,7 +220,7 @@ This section outlines planned enhancements and future project ideas.
 - [x] Figure out way to download youtube videos transcripts
 - [x] Figure out a prompt to find the most plausible parts of the video that are likely to be useful as a reel (max 30-50 seconds)
   - [ ] Does sending audio/video will help in finding the most plausible parts of the video? or transcript is enough?
-  - [ ] Transcription currently consists only transcription, without timestamps, so we need to figure out a way to get the timestamps for the transcription (e.g., investigate Gemini's capabilities for timestamped transcription or integrate a library like `stable-ts` or `whisperX`).
+  - [x] Transcription currently consists only transcription, without timestamps, so we need to figure out a way to get the timestamps for the transcription (e.g., investigate Gemini's capabilities for timestamped transcription or integrate a library like `stable-ts` or `whisperX`).
     - **Note:** An alternative for generating timestamped captions is to use OpenAI's Whisper CLI. After generating an MP3, you can run `whisper <audio_path>/<audio>.mp3 --model small` to get `.srt`, `.vtt`, and other caption files with word-level timestamps.
 - [ ] Figure out a way to automatically clip the video based on the prompt and save the clips (e.g., using FFmpeg with timestamps).
 
