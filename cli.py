@@ -68,7 +68,7 @@ def parse_arguments():
     process_parser.add_argument(
         "--transcribe",
         action="store_true",
-        help="Transcribe audio and save .txt transcript.",
+        help="Transcribe audio and save .txt transcript. (Uses stable-ts)",
     )
     process_parser.add_argument(
         "--gemini-model",

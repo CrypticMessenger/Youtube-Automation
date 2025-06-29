@@ -100,3 +100,38 @@ def generate_caption_files(audio_path, output_dir, base_filename, model_name="ti
 
         traceback.print_exc()
         return None
+
+
+def transcribe_audio_stable_ts(audio_path, output_dir, base_filename, model_name="tiny"):
+    """Transcribes audio to a .txt file using stable-whisper."""
+    if not os.path.exists(audio_path):
+        print(f"[ERROR] Audio file not found for transcription: {audio_path}")
+        return None
+
+    print(
+        f"[INFO] Transcribing {audio_path} using stable-whisper model '{model_name}'..."
+    )
+    try:
+        model = stable_whisper.load_model(model_name)
+        os.makedirs(output_dir, exist_ok=True)
+
+        result = model.transcribe(audio_path, fp16=False)
+
+        txt_path = os.path.join(output_dir, f"{base_filename}.txt")
+        result.to_txt(txt_path)
+
+        if os.path.exists(txt_path):
+            print(f"[SUCCESS] Transcript generated: {txt_path}")
+            return txt_path
+        else:
+            print(
+                f"[ERROR] stable-whisper did not generate expected transcript file for {base_filename}."
+            )
+            return None
+
+    except Exception as e:
+        print(f"[ERROR] stable-whisper transcription failed for {audio_path}: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return None
