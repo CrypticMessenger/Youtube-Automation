@@ -1,5 +1,5 @@
 # For local execution, you would first need to install these packages:
-# pip install pytubefix google-generativeai pandas
+# pip install yt-dlp google-generativeai pandas
 
 import os # For os.environ.get in main()
 

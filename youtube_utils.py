@@ -1,6 +1,6 @@
 import os
-from pytubefix import YouTube
-import pandas as pd # Required for pd.NA
+import yt_dlp
+import pandas as pd
 
 def get_sanitized_base_name(yt_title, custom_filename=None):
     if custom_filename:
@@ -9,106 +9,81 @@ def get_sanitized_base_name(yt_title, custom_filename=None):
         )
     return "".join(c if c.isalnum() or c in " ._-" else "_" for c in yt_title)
 
-def download_video(yt, base_name_for_paths, effective_video_dir, resolution_arg):
-    """Downloads the video stream."""
-    stream_search_attempts = 1
-    target_stream = None
-    if resolution_arg == "highest":
-        target_stream = yt.streams.get_highest_resolution()
-    else:
-        target_stream = yt.streams.filter(
-            res=resolution_arg,
-            progressive=True,
-            file_extension="mp4",
-        ).first()
-        stream_search_attempts = 1
-        if not target_stream: # Fallback 1: Any progressive MP4
-            target_stream = (
-                yt.streams.filter(progressive=True, file_extension="mp4")
-                .order_by("resolution")
-                .desc()
-                .first()
-            )
-            stream_search_attempts = 2
-        if not target_stream: # Fallback 2: Highest resolution adaptive MP4 (video only)
-            target_stream = (
-                yt.streams.filter(
-                    adaptive=True, file_extension="mp4", only_video=True
-                )
-                .order_by("resolution")
-                .desc()
-                .first()
-            )
-            stream_search_attempts = 3
-
-    if target_stream:
-        if stream_search_attempts > 1:
-             print(f"[INFO] Selected video stream after {stream_search_attempts} attempts: res={target_stream.resolution}, type={target_stream.mime_type}")
-        else:
-             print(f"[INFO] Selected video stream: res={target_stream.resolution}, type={target_stream.mime_type}")
-
-        file_extension = target_stream.subtype
-        if not file_extension: # Determine file extension if not directly available
-            if target_stream.mime_type and "/" in target_stream.mime_type:
-                file_extension = target_stream.mime_type.split("/")[-1]
-            else:
-                file_extension = "mp4" # Default fallback if subtype and mime_type are unhelpful
-        video_filename = f"{base_name_for_paths}.{file_extension}"
-        os.makedirs(effective_video_dir, exist_ok=True)
-        print(f"[INFO] Attempting to download video: {video_filename} to {effective_video_dir}")
-        try:
-            downloaded_path = target_stream.download(
-                output_path=effective_video_dir, filename=video_filename
-            )
-            print(f"[SUCCESS] Video downloaded: {downloaded_path}")
-            return os.path.abspath(downloaded_path)
-        except Exception as e:
-            print(f"[ERROR] Video download failed for {base_name_for_paths}: {e}")
-            return None
-    else:
-        print(
-            f"[ERROR] No suitable video stream found for {base_name_for_paths} (tried {resolution_arg} and fallbacks). Skipping video download."
-        )
+def get_video_info(url):
+    """Gets video info using yt-dlp."""
+    ydl_opts = {'quiet': True}
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return info
+    except Exception as e:
+        print(f"[ERROR] Could not fetch YouTube video details for {url}: {e}")
         return None
 
-def download_audio_stream(yt, base_name_for_paths, effective_audio_dir):
-    """Downloads a dedicated audio stream, typically for later conversion."""
-    audio_stream = yt.streams.get_audio_only()
-    stream_type_selected = "default audio_only"
-    if not audio_stream: # Fallback: Filter for best ABR audio if default get_audio_only() fails
-        audio_stream = (
-            yt.streams.filter(only_audio=True)
-            .order_by("abr") # Order by Average Bit Rate
-            .desc()
-            .first()
-        )
-        stream_type_selected = "filtered highest abr audio"
+def download_video(video_info, base_name_for_paths, effective_video_dir, resolution_arg):
+    """Downloads the video stream using yt-dlp."""
+    video_url = video_info['webpage_url']
+    video_filename = f"{base_name_for_paths}.mp4"
+    output_path = os.path.join(effective_video_dir, video_filename)
+    
+    format_selector = f"bestvideo[height<={resolution_arg[:-1]}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+    if resolution_arg == 'highest':
+        format_selector = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
 
-    if audio_stream:
-        print(f"[INFO] Selected audio stream ({stream_type_selected}): type={audio_stream.mime_type}, abr={audio_stream.abr}")
-        temp_audio_filename = f"{base_name_for_paths}_audiotemp.{audio_stream.subtype or 'mp4'}" # Use subtype or fallback to mp4
-        os.makedirs(effective_audio_dir, exist_ok=True)
-        print(f"[INFO] Attempting to download audio stream: {temp_audio_filename} to {effective_audio_dir}")
-        try:
-            raw_audio_input_path = audio_stream.download(
-                output_path=effective_audio_dir,
-                filename=temp_audio_filename,
-            )
-            print(f"[SUCCESS] Raw audio stream downloaded: {raw_audio_input_path}")
-            return os.path.abspath(raw_audio_input_path)
-        except Exception as e:
-            print(f"[ERROR] Raw audio stream download failed for {base_name_for_paths}: {e}")
-            return None
-    else:
-        print("[ERROR] No dedicated audio stream found.")
+    ydl_opts = {
+        'format': format_selector,
+        'outtmpl': output_path,
+        'quiet': True,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([video_url])
+        print(f"[SUCCESS] Video downloaded: {output_path}")
+        return os.path.abspath(output_path)
+    except Exception as e:
+        print(f"[ERROR] Video download failed for {base_name_for_paths}: {e}")
+        return None
+
+def download_audio_stream(video_info, base_name_for_paths, effective_audio_dir):
+    """Downloads a dedicated audio stream using yt-dlp."""
+    video_url = video_info['webpage_url']
+    temp_audio_filename = f"{base_name_for_paths}_audiotemp.m4a"
+    output_path = os.path.join(effective_audio_dir, temp_audio_filename)
+
+    ydl_opts = {
+        'format': 'bestaudio[ext=m4a]/bestaudio',
+        'outtmpl': output_path,
+        'quiet': True,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([video_url])
+        print(f"[SUCCESS] Raw audio stream downloaded: {output_path}")
+        return os.path.abspath(output_path)
+    except Exception as e:
+        print(f"[ERROR] Raw audio stream download failed for {base_name_for_paths}: {e}")
         return None
 
 def get_yt_object_and_canonical_url(input_url):
     """Creates a YouTube object and returns it along with the canonical URL."""
+    info = get_video_info(input_url)
+    if info:
+        return info, info.get('webpage_url')
+    return None, None
+
+
+def get_video_duration(video_path):
+    """
+    Get the duration of a video file in seconds.
+    This function is not currently used in the main workflow but is available for future use.
+    """
+    import ffmpeg
     try:
-        yt = YouTube(input_url)
-        canonical_url = yt.watch_url
-        return yt, canonical_url
-    except Exception as e:
-        print(f"[ERROR] Could not fetch YouTube video details for {input_url}: {e}")
-        return None, None
+        probe = ffmpeg.probe(video_path)
+        video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+        return float(video_info['duration'])
+    except (ffmpeg.Error, StopIteration) as e:
+        print(f"Error getting duration for {video_path}: {e}")
+        return None

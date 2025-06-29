@@ -1,5 +1,5 @@
 protobuf==6.31.1
-pytubefix==9.2.0
+yt-dlp
 google-generativeai
 pandas
 stable-ts

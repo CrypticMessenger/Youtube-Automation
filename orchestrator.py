@@ -1,6 +1,6 @@
 import os
 import pandas as pd # For pd.NA and type hints
-from pytubefix import YouTube # For type hints, and used by handle_remove_url (indirectly via get_yt_object_and_canonical_url)
+
 
 # Import from our new modules
 from manifest import (
@@ -14,6 +14,7 @@ from youtube_utils import (
     download_video,
     download_audio_stream,
     get_yt_object_and_canonical_url,
+    get_video_info,
 )
 from audio_processing import convert_to_mp3, generate_caption_files
 from gemini_interaction import identify_viral_clips_gemini
@@ -29,7 +30,11 @@ def process_youtube_url(args, manifest_df, manifest_path):
     if not yt:
         return manifest_df # Error already printed
 
-    current_base_name = get_sanitized_base_name(yt.title, args.filename)
+    video_info = get_video_info(canonical_url)
+    if not video_info:
+        return manifest_df # Error already printed
+
+    current_base_name = get_sanitized_base_name(video_info.get('title', 'default_title'), args.filename)
     print(f"[INFO] Processing URL: {input_url_arg} (Canonical: {canonical_url})")
 
     entry = get_manifest_entry(manifest_df, canonical_url)
@@ -102,7 +107,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
             else:
                 print(f"[INFO] Attempting to download video: {base_name_for_paths}")
 
-            downloaded_path = download_video(yt, base_name_for_paths, args.effective_video_dir, args.resolution)
+            downloaded_path = download_video(video_info, base_name_for_paths, args.effective_video_dir, args.resolution)
 
             if downloaded_path:
                 video_download_path_to_use = downloaded_path
@@ -196,7 +201,7 @@ def process_youtube_url(args, manifest_df, manifest_path):
                 source_for_ffmpeg = video_download_path_to_use
             else: # Audio-only mode, or video download failed/skipped
                 print("[INFO] Attempting to download dedicated audio stream for MP3 conversion...")
-                raw_audio_input_path = download_audio_stream(yt, base_name_for_paths, args.effective_audio_dir)
+                raw_audio_input_path = download_audio_stream(video_info, base_name_for_paths, args.effective_audio_dir)
                 if raw_audio_input_path:
                     source_for_ffmpeg = raw_audio_input_path
                 else:
@@ -676,9 +681,9 @@ def process_youtube_url(args, manifest_df, manifest_path):
 
 # --- Manage Command Handlers ---
 def handle_remove_url(url_to_remove_input, manifest_df, manifest_path):
-    yt_remove, url_to_remove_canonical = get_yt_object_and_canonical_url(url_to_remove_input)
+    video_info, url_to_remove_canonical = get_yt_object_and_canonical_url(url_to_remove_input)
 
-    if not yt_remove:
+    if not video_info:
         print(
             f"[WARNING] Could not get canonical URL for '{url_to_remove_input}'. Trying to remove using the provided input."
         )
@@ -759,8 +764,8 @@ def handle_list_manifest(manifest_df):
     print("--- End of Manifest List ---")
 
 def handle_generate_video(args, manifest_df):
-    yt_obj, canonical_url = get_yt_object_and_canonical_url(args.url)
-    if not yt_obj:
+    video_info, canonical_url = get_yt_object_and_canonical_url(args.url)
+    if not video_info:
         print(f"[ERROR] Could not process URL: {args.url}")
         return
 
