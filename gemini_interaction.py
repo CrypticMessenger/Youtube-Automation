@@ -1,5 +1,7 @@
 import os
 import google.generativeai as genai
+import json
+import re
 
 # --- Gemini Interaction Functions ---
 
@@ -29,7 +31,7 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): 
     Technical & Structural Requirements:
     Segment Length: Strictly 30-50 seconds. Use word count or sentence structure to estimate. (Assume average speaking pace of 2-3 words per second).
     Standalone Cohesion: The segment must make sense on its own, without requiring extensive context from the rest of the video.
-    Clear Start & End Points: Identify precise start and end phrases/sentences for seamless trimming.
+    Clear Start & End Points: Identify precise start & end phrases/sentences for seamless trimming.
     Number of Sections: {number_of_sections_placeholder}
 
     Output Format for Each Identified Segment:
@@ -51,7 +53,7 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): 
     Now, please analyze the following YouTube video transcript:
 
     \"\"\"
-    {youtube_transcript_placeholder}
+    {transcript_text}
     \"\"\"
 
     Key considerations for you, the AI, when processing:
@@ -73,9 +75,8 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): 
 
     return prompt_template.format(
         number_of_sections_placeholder=number_of_sections_placeholder_text,
-        youtube_transcript_placeholder=transcript_text,
+        transcript_text=transcript_text,
     )
-
 
 
 
@@ -146,4 +147,102 @@ def identify_viral_clips_gemini(
         print(f"[ERROR] Gemini viral clip ID failed: {e}")
         import traceback
         traceback.print_exc() # Keep traceback for debugging errors with Gemini API
+        return None
+
+def get_viral_timestamps_prompt_text(srt_content, analysis_content):
+    """
+    Generates the prompt for extracting viral timestamps from SRT and analysis text.
+    """
+    prompt_template = """
+    You are a precise Video Editor AI. Your task is to analyze the provided SRT file content and a viral clip analysis text.
+    Based on the analysis, identify the exact start and end timestamps for each viral segment identified in the analysis.
+
+    The output MUST be a JSON object containing a list of segments. Each segment object must have "start_time" and "end_time" keys.
+
+    Example Output:
+    ```json
+    {{
+      "segments": [
+        {{
+          "start_time": "00:01:23,456",
+          "end_time": "00:01:58,789"
+        }},
+        {{
+          "start_time": "00:03:10,123",
+          "end_time": "00:03:45,456"
+        }}
+      ]
+    }}
+    ```
+
+    Here is the SRT file content:
+    \"\"\"
+    {srt_content}
+    \"\"\"
+
+    Here is the viral clip analysis:
+    \"\"\"
+    {analysis_content}
+    \"\"\"
+
+    Now, provide the JSON output with the exact timestamps.
+    """
+    return prompt_template.format(
+        srt_content=srt_content,
+        analysis_content=analysis_content,
+    )
+
+def get_viral_timestamps_gemini(srt_content, analysis_content, model_name):
+    """
+    Calls the Gemini model to get viral timestamps.
+    """
+    if not srt_content or not srt_content.strip():
+        print("[ERROR] SRT content is empty.")
+        return None
+    if not analysis_content or not analysis_content.strip():
+        print("[ERROR] Analysis content is empty.")
+        return None
+
+    print(f"[INFO] Getting viral timestamps with {model_name}...")
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        print("[ERROR] GOOGLE_API_KEY not set.")
+        return None
+
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name=model_name)
+        prompt = get_viral_timestamps_prompt_text(srt_content, analysis_content)
+        print("[DEBUG] Sending prompt to Gemini for viral timestamps extraction.")
+        print("[DEBUG] Prompt:", prompt)  # Debugging the prompt content
+        response = model.generate_content([prompt], request_options={"timeout": 900})
+        print("[DEBUG] Gemini response received for viral timestamps extraction.")
+        print("[DEBUG] Response:", (response))
+        response_text = ""
+        if hasattr(response, "text") and response.text:
+            response_text = response.text
+        elif hasattr(response, "parts") and response.parts:
+            for part in response.parts:
+                if hasattr(part, "text") and part.text:
+                    response_text += part.text + "\n"
+            response_text = response.text.strip()
+
+        # Clean the response to extract only the JSON part
+        json_match = re.search(r'```json\n(.*)\n```', response_text, re.DOTALL)
+        if json_match:
+            json_string = json_match.group(1)
+            return json.loads(json_string)
+        else:
+            # Fallback for cases where the model doesn't use markdown
+            try:
+                return json.loads(response_text)
+            except json.JSONDecodeError:
+                print("[ERROR] Failed to decode JSON from Gemini response.")
+                print("Raw response:", response_text)
+                return None
+
+    except Exception as e:
+        print(f"[ERROR] Gemini viral timestamps extraction failed: {e}")
+        import traceback
+        traceback.print_exc()
         return None

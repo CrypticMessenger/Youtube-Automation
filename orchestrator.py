@@ -1,5 +1,6 @@
 import os
 import pandas as pd # For pd.NA and type hints
+import json
 
 
 # Import from our new modules
@@ -17,7 +18,10 @@ from youtube_utils import (
     get_video_info,
 )
 from audio_processing import convert_to_mp3, generate_caption_files
-from gemini_interaction import identify_viral_clips_gemini
+from gemini_interaction import (
+    identify_viral_clips_gemini,
+    get_viral_timestamps_gemini,
+)
 from audio_processing import transcribe_audio_stable_ts
 from video_processing import burn_subtitles, generate_video_with_captions
 
@@ -604,6 +608,35 @@ def process_youtube_url(args, manifest_df, manifest_path):
     # --- 6. Burn Subtitles ---
     burned_video_path_from_manifest = entry.get("burned_video_path")
     burned_video_status_from_manifest = entry.get("status_burned_video_generated")
+
+    if args.get_viral_timestamps:
+        print("[INFO] Getting viral timestamps...")
+        srt_path = entry.get("caption_srt_path")
+        analysis_path = entry.get("analysis_path")
+
+        if pd.isna(srt_path) or not os.path.exists(srt_path):
+            print("[ERROR] SRT file not found. Please generate captions first.")
+            return manifest_df
+        if pd.isna(analysis_path) or not os.path.exists(analysis_path):
+            print("[ERROR] Analysis file not found. Please run viral short identification first.")
+            return manifest_df
+
+        with open(srt_path, "r", encoding="utf-8") as f:
+            srt_content = f.read()
+        with open(analysis_path, "r", encoding="utf-8") as f:
+            analysis_content = f.read()
+
+        timestamps_json = get_viral_timestamps_gemini(
+            srt_content,
+            analysis_content,
+            args.clip_identifier_model,
+        )
+
+        if timestamps_json:
+            print("[SUCCESS] Viral timestamps identified:")
+            print(json.dumps(timestamps_json, indent=2))
+        else:
+            print("[ERROR] Could not retrieve viral timestamps.")
 
     if args.burn_subtitles:
         cached_burned_video_valid_and_present = False

@@ -22,7 +22,7 @@ def main():
 
     # Check for GOOGLE_API_KEY if transcription or analysis is requested.
     # The os module is imported at the top of the file.
-    if hasattr(args, "viral_short_identifier") and args.viral_short_identifier:
+    if (hasattr(args, "viral_short_identifier") and args.viral_short_identifier) or (hasattr(args, "get_viral_timestamps") and args.get_viral_timestamps):
         if not os.environ.get("GOOGLE_API_KEY"):
             print(
                 "[ERROR] GOOGLE_API_KEY environment variable is not set. Required for viral clip analysis."

@@ -80,6 +80,11 @@ def parse_arguments():
         help="Identify viral short clips from transcript.",
     )
     process_parser.add_argument(
+        "--get-viral-timestamps",
+        action="store_true",
+        help="Get viral timestamps from viral analysis.",
+    )
+    process_parser.add_argument(
         "--number-of-sections",
         type=int,
         default=None,
