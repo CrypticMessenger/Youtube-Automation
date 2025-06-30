@@ -633,8 +633,27 @@ def process_youtube_url(args, manifest_df, manifest_path):
         )
 
         if timestamps_json:
-            print("[SUCCESS] Viral timestamps identified:")
-            print(json.dumps(timestamps_json, indent=2))
+            try:
+                base_output_dir = os.path.abspath(args.output)
+                timestamps_dir = os.path.join(base_output_dir, "viral_clip_timestamps")
+                os.makedirs(timestamps_dir, exist_ok=True)
+
+                timestamp_file_path = os.path.join(
+                    timestamps_dir, f"{base_name_for_paths}_timestamps.json"
+                )
+
+                with open(timestamp_file_path, "w", encoding="utf-8") as f:
+                    json.dump(timestamps_json, f, indent=4)
+
+                print(
+                    f"[SUCCESS] Viral timestamps identified and saved to: {timestamp_file_path}"
+                )
+                print(json.dumps(timestamps_json, indent=2))
+
+            except Exception as e:
+                print(f"[ERROR] Could not save viral timestamps to file: {e}")
+                print("[SUCCESS] Viral timestamps identified (but not saved):")
+                print(json.dumps(timestamps_json, indent=2))
         else:
             print("[ERROR] Could not retrieve viral timestamps.")
 

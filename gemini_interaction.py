@@ -213,11 +213,8 @@ def get_viral_timestamps_gemini(srt_content, analysis_content, model_name):
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name=model_name)
         prompt = get_viral_timestamps_prompt_text(srt_content, analysis_content)
-        print("[DEBUG] Sending prompt to Gemini for viral timestamps extraction.")
-        print("[DEBUG] Prompt:", prompt)  # Debugging the prompt content
         response = model.generate_content([prompt], request_options={"timeout": 900})
         print("[DEBUG] Gemini response received for viral timestamps extraction.")
-        print("[DEBUG] Response:", (response))
         response_text = ""
         if hasattr(response, "text") and response.text:
             response_text = response.text
