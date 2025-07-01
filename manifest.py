@@ -2,6 +2,8 @@ import os
 import pandas as pd
 from datetime import datetime
 
+from processors.base import Colors
+
 # --- Manifest Constants ---
 MANIFEST_COLUMNS = [
     "youtube_url",
@@ -73,7 +75,7 @@ def load_manifest(manifest_path):
                         df[col_name] = df[col_name].astype(pd.BooleanDtype())
                     except Exception as e_astype:
                         print(
-                            f"[ERROR] load_manifest: Failed to convert column '{col_name}' to BooleanDtype. Error: {e_astype}"
+                            f"{Colors.ERROR}[ERROR]{Colors.RESET} load_manifest: Failed to convert column '{col_name}' to BooleanDtype. Error: {e_astype}"
                         )
                         print(
                             f"         Unique values in column '{col_name}' before error: {df[col_name].unique()[:10]}"
@@ -109,17 +111,17 @@ def load_manifest(manifest_path):
 
             return df
         except pd.errors.EmptyDataError:
-            print(f"[WARNING] Manifest file {manifest_path} is empty. Starting fresh.")
+            print(f"{Colors.WARNING}[WARNING]{Colors.RESET} Manifest file {manifest_path} is empty. Starting fresh.")
         except Exception as e:
             print(
-                f"[ERROR] Could not load manifest {manifest_path}: {e}. Starting fresh."
+                f"{Colors.ERROR}[ERROR]{Colors.RESET} Could not load manifest {manifest_path}: {e}. Starting fresh."
             )
             import traceback
 
             traceback.print_exc()
 
     print(
-        f"[INFO] Creating a new manifest structure as {manifest_path} does not exist or failed to load."
+        f"{Colors.INFO}[INFO]{Colors.RESET} Creating a new manifest structure as {manifest_path} does not exist or failed to load."
     )
     df = pd.DataFrame(columns=MANIFEST_COLUMNS)
     dtype_map = {
@@ -145,7 +147,7 @@ def save_manifest(df, manifest_path):
     try:
         df.to_csv(manifest_path, index=False)
     except Exception as e:
-        print(f"[ERROR] Could not save manifest to {manifest_path}: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Could not save manifest to {manifest_path}: {e}")
 
 
 def get_manifest_entry(df, url_to_find):
@@ -215,7 +217,7 @@ def update_manifest_entry(df, url_key, data_dict):
                 df.loc[idx, key] = value
             except Exception as e:
                 print(
-                    f"[ERROR] update_manifest_entry (update): Failed to set {key}={value} (type: {type(value)}) for URL {url_key}. Error: {e}"
+                    f"{Colors.ERROR}[ERROR]{Colors.RESET} update_manifest_entry (update): Failed to set {key}={value} (type: {type(value)}) for URL {url_key}. Error: {e}"
                 )
                 print(
                     f"       Column '{key}' dtype: {df[key].dtype if key in df else 'Not in df'}"
@@ -234,7 +236,7 @@ def update_manifest_entry(df, url_key, data_dict):
                         new_row_df[col] = new_row_df[col].astype(df[col].dtype)
                     except Exception as e_astype_concat:
                         print(
-                            f"[WARNING] update_manifest_entry (add): Could not astype column '{col}' for new entry. Error: {e_astype_concat}. Value: {new_row_df[col].iloc[0]}, Target Dtype: {df[col].dtype}"
+                            f"{Colors.WARNING}[WARNING]{Colors.RESET} update_manifest_entry (add): Could not astype column '{col}' for new entry. Error: {e_astype_concat}. Value: {new_row_df[col].iloc[0]}, Target Dtype: {df[col].dtype}"
                         )
                         # Fallback: if astype fails, try to proceed; concat might still work or give a more specific error
                 # If a column from df is not in new_row_df (shouldn't happen if new_entry_data has all MANIFEST_COLUMNS)
@@ -243,7 +245,7 @@ def update_manifest_entry(df, url_key, data_dict):
             df = pd.concat([df, new_row_df], ignore_index=True)
         except Exception as e:
             print(
-                f"[ERROR] update_manifest_entry (add): Failed to concat new entry for URL {url_key}. Error: {e}"
+                f"{Colors.ERROR}[ERROR]{Colors.RESET} update_manifest_entry (add): Failed to concat new entry for URL {url_key}. Error: {e}"
             )
             print(f"       New entry data: {new_entry_data}")
             print(f"       Main df dtypes: \n{df.dtypes}")

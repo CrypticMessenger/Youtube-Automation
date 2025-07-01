@@ -1,7 +1,15 @@
-
 import os
 import pandas as pd
 from abc import ABC, abstractmethod
+
+# ANSI escape codes for colors
+class Colors:
+    RESET = "\033[0m"
+    INFO = "\033[94m"    # Blue
+    SUCCESS = "\033[92m" # Green
+    WARNING = "\033[93m" # Yellow
+    ERROR = "\033[91m"   # Red
+    CACHE = "\033[96m"   # Cyan
 
 class ProcessingStep(ABC):
     """Abstract base class for a step in the video processing pipeline."""
@@ -26,8 +34,8 @@ class ProcessingStep(ABC):
     def run(self):
         """Runs the step if it's not already complete or if forced."""
         if not self.args.force and self.is_complete:
-            print(f"[CACHE] Skipping {self.__class__.__name__} for '{self.base_name}'")
+            print(f"{Colors.CACHE}[CACHE]{Colors.RESET} Skipping {self.__class__.__name__} for '{self.base_name}'")
             return self.entry
 
-        print(f"[INFO] Running {self.__class__.__name__} for '{self.base_name}'...")
+        print(f"{Colors.INFO}[INFO]{Colors.RESET} Running {self.__class__.__name__} for '{self.base_name}'...")
         return self.process()

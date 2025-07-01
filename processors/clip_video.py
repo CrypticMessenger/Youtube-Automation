@@ -1,10 +1,9 @@
-
 import os
 import json
 import subprocess
 import pandas as pd
 
-from .base import ProcessingStep
+from .base import ProcessingStep, Colors
 
 
 class ClipVideoStep(ProcessingStep):
@@ -29,10 +28,10 @@ class ClipVideoStep(ProcessingStep):
 
     def process(self):
         if not os.path.exists(self.burned_video_path):
-            print(f"[ERROR] Burned video not found at: {self.burned_video_path}")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Burned video not found at: {self.burned_video_path}")
             return self.entry
         if not os.path.exists(self.timestamp_file_path):
-            print(f"[ERROR] Timestamps JSON not found at: {self.timestamp_file_path}")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Timestamps JSON not found at: {self.timestamp_file_path}")
             return self.entry
 
         with open(self.timestamp_file_path, "r") as f:
@@ -48,10 +47,10 @@ class ClipVideoStep(ProcessingStep):
             )
 
             if not start_time or not end_time:
-                print(f"[WARNING] Skipping segment {i+1} due to missing timestamps.")
+                print(f"{Colors.WARNING}[WARNING]{Colors.RESET} Skipping segment {i+1} due to missing timestamps.")
                 continue
 
-            print(f"[INFO] Clipping segment {i+1}: {start_time} -> {end_time}")
+            print(f"{Colors.INFO}[INFO]{Colors.RESET} Clipping segment {i+1}: {start_time} -> {end_time}")
             try:
                 command = [
                     "ffmpeg", "-y",
@@ -64,10 +63,10 @@ class ClipVideoStep(ProcessingStep):
                 subprocess.run(
                     command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
                 )
-                print(f"[SUCCESS] Saved clip to {clip_output_path}")
+                print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Saved clip to {clip_output_path}")
             except subprocess.CalledProcessError as e:
-                print(f"[ERROR] Failed to clip video for segment {i+1}.")
+                print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Failed to clip video for segment {i+1}.")
                 print(f"ffmpeg stderr: {e.stderr.decode()}")
             except Exception as e:
-                print(f"[ERROR] An unexpected error occurred during clipping: {e}")
+                print(f"{Colors.ERROR}[ERROR]{Colors.RESET} An unexpected error occurred during clipping: {e}")
         return self.entry

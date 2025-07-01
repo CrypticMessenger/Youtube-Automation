@@ -1,8 +1,7 @@
-
 import os
 import pandas as pd
 
-from .base import ProcessingStep
+from .base import ProcessingStep, Colors
 from youtube_utils import get_video_info, download_video
 
 
@@ -18,6 +17,7 @@ class VideoDownloadStep(ProcessingStep):
     def process(self):
         video_info = get_video_info(self.url)
         if not video_info:
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Could not retrieve video info for {self.url}")
             self.entry["status_video_downloaded"] = False
             return self.entry
 

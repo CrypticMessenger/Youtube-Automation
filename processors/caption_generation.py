@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 
-from .base import ProcessingStep
+from .base import ProcessingStep, Colors
 from audio_processing import generate_caption_files
 
 
@@ -19,7 +19,7 @@ class CaptionGenerationStep(ProcessingStep):
     def process(self):
         mp3_path = self.entry.get("mp3_path")
         if pd.isna(mp3_path) or not os.path.exists(mp3_path):
-            print("[ERROR] MP3 file not available for caption generation.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} MP3 file not available for caption generation.")
             self.entry["status_captions_generated"] = False
             self.entry["status_transcript_generated"] = False
             return self.entry

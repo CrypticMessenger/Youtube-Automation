@@ -1,8 +1,7 @@
-
 import os
 import pandas as pd
 
-from .base import ProcessingStep
+from .base import ProcessingStep, Colors
 from gemini_interaction import identify_viral_clips_gemini
 
 
@@ -20,7 +19,7 @@ class ViralAnalysisStep(ProcessingStep):
     def process(self):
         transcript_path = self.entry.get("transcript_path")
         if pd.isna(transcript_path) or not os.path.exists(transcript_path):
-            print("[ERROR] Transcript not available for viral analysis.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Transcript not available for viral analysis.")
             self.entry["status_analysis_generated"] = False
             return self.entry
 
@@ -28,7 +27,7 @@ class ViralAnalysisStep(ProcessingStep):
             transcript_text = f.read()
 
         if not transcript_text.strip():
-            print("[ERROR] Transcript file is empty, cannot perform analysis.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Transcript file is empty, cannot perform analysis.")
             self.entry["status_analysis_generated"] = False
             return self.entry
 

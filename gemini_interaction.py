@@ -3,6 +3,8 @@ import google.generativeai as genai
 import json
 import re
 
+from processors.base import Colors
+
 # --- Gemini Interaction Functions ---
 
 def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): # Renamed to avoid conflict if we later import the original prompts.py for some reason
@@ -52,9 +54,9 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): 
     Your ultimate objective is to provide me with ready-to-trim goldmines from my transcript that have the highest probability of becoming highly watchable, shareable, and viral short-form content.
     Now, please analyze the following YouTube video transcript:
 
-    \"\"\"
+    """
     {transcript_text}
-    \"\"\"
+    """
 
     Key considerations for you, the AI, when processing:
     Inferring from Text: Since you only have text, you'll need to infer pacing, emphasis, and potential visual accompaniments based on the language used.
@@ -85,13 +87,13 @@ def identify_viral_clips_gemini(
     transcript_text, number_of_sections, model_name, analysis_output_dir, base_filename
 ):
     if not transcript_text or not transcript_text.strip():
-        print("[ERROR] Transcript text is empty for viral clip ID.")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Transcript text is empty for viral clip ID.")
         return None
 
-    print(f"[INFO] Identifying viral clips with {model_name}...")
+    print(f"{Colors.INFO}[INFO]{Colors.RESET} Identifying viral clips with {model_name}...")
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        print("[ERROR] GOOGLE_API_KEY not set.")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} GOOGLE_API_KEY not set.")
         return None
 
     analysis_file_path = None
@@ -125,7 +127,7 @@ def identify_viral_clips_gemini(
                     # This was a granular log, already commented out.
             except Exception as e_parse:
                 print(
-                    f"[ERROR] Parsing Gemini response candidates for analysis: {e_parse}"
+                    f"{Colors.ERROR}[ERROR]{Colors.RESET} Parsing Gemini response candidates for analysis: {e_parse}"
                 )
 
         analysis_text_to_save = analysis_text.strip() if analysis_text else ""
@@ -137,14 +139,14 @@ def identify_viral_clips_gemini(
             f.write(analysis_text_to_save)
 
         if analysis_text_to_save:
-            print(f"[SUCCESS] Viral clip analysis saved to: {analysis_file_path}")
+            print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Viral clip analysis saved to: {analysis_file_path}")
             return analysis_file_path
         else:
-            print(f"[WARNING] Empty viral clip analysis saved: {analysis_file_path}")
+            print(f"{Colors.WARNING}[WARNING]{Colors.RESET} Empty viral clip analysis saved: {analysis_file_path}")
             return analysis_file_path  # Return path even if content is empty, manifest status will reflect this
 
     except Exception as e:
-        print(f"[ERROR] Gemini viral clip ID failed: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Gemini viral clip ID failed: {e}")
         import traceback
         traceback.print_exc() # Keep traceback for debugging errors with Gemini API
         return None
@@ -176,14 +178,14 @@ def get_viral_timestamps_prompt_text(srt_content, analysis_content):
     ```
 
     Here is the SRT file content:
-    \"\"\"
+    """
     {srt_content}
-    \"\"\"
+    """
 
     Here is the viral clip analysis:
-    \"\"\"
+    """
     {analysis_content}
-    \"\"\"
+    """
 
     Now, provide the JSON output with the exact timestamps.
     """
@@ -197,16 +199,16 @@ def get_viral_timestamps_gemini(srt_content, analysis_content, model_name):
     Calls the Gemini model to get viral timestamps.
     """
     if not srt_content or not srt_content.strip():
-        print("[ERROR] SRT content is empty.")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} SRT content is empty.")
         return None
     if not analysis_content or not analysis_content.strip():
-        print("[ERROR] Analysis content is empty.")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Analysis content is empty.")
         return None
 
-    print(f"[INFO] Getting viral timestamps with {model_name}...")
+    print(f"{Colors.INFO}[INFO]{Colors.RESET} Getting viral timestamps with {model_name}...")
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        print("[ERROR] GOOGLE_API_KEY not set.")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} GOOGLE_API_KEY not set.")
         return None
 
     try:
@@ -234,12 +236,12 @@ def get_viral_timestamps_gemini(srt_content, analysis_content, model_name):
             try:
                 return json.loads(response_text)
             except json.JSONDecodeError:
-                print("[ERROR] Failed to decode JSON from Gemini response.")
+                print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Failed to decode JSON from Gemini response.")
                 print("Raw response:", response_text)
                 return None
 
     except Exception as e:
-        print(f"[ERROR] Gemini viral timestamps extraction failed: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Gemini viral timestamps extraction failed: {e}")
         import traceback
         traceback.print_exc()
         return None

@@ -2,6 +2,7 @@ import os
 import subprocess
 import stable_whisper
 
+from processors.base import Colors
 
 def convert_to_mp3(input_path, output_mp3_path):
     """Converts input to MP3. Returns output_mp3_path on success, None on failure."""
@@ -33,20 +34,22 @@ def convert_to_mp3(input_path, output_mp3_path):
             != output_mp3_path  # Ensure we don't delete the output if it's same as input (e.g. re-encoding an mp3)
         ):
             try:
-                os.remove(input_path)
+                print(
+                    f"{Colors.WARNING}[WARNING]{Colors.RESET} Could not remove temporary audio file {input_path}: {oe}"
+                )
             except OSError as oe:
                 print(
-                    f"[WARNING] Could not remove temporary audio file {input_path}: {oe}"
+                    f"{Colors.WARNING}[WARNING]{Colors.RESET} Could not remove temporary audio file {input_path}: {oe}"
                 )
-        print(f"[SUCCESS] Audio converted to MP3: {output_mp3_path}")
+        print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Audio converted to MP3: {output_mp3_path}")
         return output_mp3_path
     except subprocess.CalledProcessError as e:
         print(
-            f"[ERROR] ffmpeg conversion failed (return code {e.returncode}): {' '.join(e.cmd)}"
+            f"{Colors.ERROR}[ERROR]{Colors.RESET} ffmpeg conversion failed (return code {e.returncode}): {' '.join(e.cmd)}"
         )
     except Exception as e:  # Catch other potential errors during conversion
         print(
-            f"[ERROR] ffmpeg conversion failed: {e} for {input_path} to {output_mp3_path}"
+            f"{Colors.ERROR}[ERROR]{Colors.RESET} ffmpeg conversion failed: {e} for {input_path} to {output_mp3_path}"
         )
 
     # Attempt to remove temporary input file even on conversion error, if it exists and is a temp file
@@ -59,7 +62,7 @@ def convert_to_mp3(input_path, output_mp3_path):
             os.remove(input_path)
         except OSError as oe:
             print(
-                f"[WARNING] Could not remove temporary file {input_path} on error: {oe}"
+                f"{Colors.WARNING}[WARNING]{Colors.RESET} Could not remove temporary file {input_path} on error: {oe}"
             )
     return None
 
@@ -67,11 +70,11 @@ def convert_to_mp3(input_path, output_mp3_path):
 def generate_caption_files(audio_path, output_dir, base_filename, model_name="tiny", transcript_output_dir=None):
     """Generates caption files (.srt, .ass) and optionally a transcript (.txt) using stable-whisper."""
     if not os.path.exists(audio_path):
-        print(f"[ERROR] Audio file not found for caption generation: {audio_path}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Audio file not found for caption generation: {audio_path}")
         return None
 
     print(
-        f"[INFO] Generating captions and transcript for {audio_path} using stable-whisper model '{model_name}'..."
+        f"{Colors.INFO}[INFO]{Colors.RESET} Generating captions and transcript for {audio_path} using stable-whisper model '{model_name}'..."
     )
     try:
         model = stable_whisper.load_model(model_name)
@@ -99,16 +102,16 @@ def generate_caption_files(audio_path, output_dir, base_filename, model_name="ti
             generated_files["txt"] = txt_path
 
         if generated_files:
-            print(f"[SUCCESS] Generated files: {', '.join(generated_files.values())}")
+            print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Generated files: {', '.join(generated_files.values())}")
             return generated_files
         else:
             print(
-                f"[ERROR] stable-whisper did not generate any expected files for {base_filename}."
+                f"{Colors.ERROR}[ERROR]{Colors.RESET} stable-whisper did not generate any expected files for {base_filename}."
             )
             return None
 
     except Exception as e:
-        print(f"[ERROR] stable-whisper caption/transcript generation failed for {audio_path}: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} stable-whisper caption/transcript generation failed for {audio_path}: {e}")
         import traceback
 
         traceback.print_exc()

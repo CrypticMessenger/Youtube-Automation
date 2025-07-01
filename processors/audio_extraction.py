@@ -1,8 +1,7 @@
-
 import os
 import pandas as pd
 
-from .base import ProcessingStep
+from .base import ProcessingStep, Colors
 from youtube_utils import get_video_info, download_audio_stream
 from audio_processing import convert_to_mp3
 
@@ -21,10 +20,10 @@ class AudioExtractionStep(ProcessingStep):
         video_path = self.entry.get("video_path")
 
         if pd.notna(video_path) and os.path.exists(video_path):
-            print(f"[INFO] Using downloaded video as source for MP3: {video_path}")
+            print(f"{Colors.INFO}[INFO]{Colors.RESET} Using downloaded video as source for MP3: {video_path}")
             source_for_ffmpeg = video_path
         else:
-            print("[INFO] Video not found, downloading dedicated audio stream...")
+            print(f"{Colors.INFO}[INFO]{Colors.RESET} Video not found, downloading dedicated audio stream...")
             video_info = get_video_info(self.url)
             if not video_info:
                 self.entry["status_mp3_converted"] = False
@@ -37,7 +36,7 @@ class AudioExtractionStep(ProcessingStep):
             )
 
         if not source_for_ffmpeg:
-            print("[ERROR] No valid source for audio extraction.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} No valid source for audio extraction.")
             self.entry["mp3_path"] = pd.NA
             self.entry["status_mp3_converted"] = False
             return self.entry

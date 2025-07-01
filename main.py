@@ -10,6 +10,7 @@ from orchestrator import (
     handle_list_manifest,
 )
 from cli import parse_arguments
+from processors.base import Colors
 
 
 def main():
@@ -20,7 +21,7 @@ def main():
        (hasattr(args, "get_viral_timestamps") and args.get_viral_timestamps):
         if not os.environ.get("GOOGLE_API_KEY"):
             print(
-                "[ERROR] GOOGLE_API_KEY environment variable is not set. Required for viral clip analysis."
+                f"{Colors.ERROR}[ERROR]{Colors.RESET} GOOGLE_API_KEY environment variable is not set. Required for viral clip analysis."
             )
             # You might want to exit here if the key is absolutely critical
             # import sys

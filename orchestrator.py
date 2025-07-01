@@ -22,6 +22,7 @@ from processors import (
     BurnVideoStep,
     ClipVideoStep,
 )
+from processors.base import Colors
 
 # --- Dependency Graph Definition ---
 
@@ -76,7 +77,9 @@ class Orchestrator:
         return entry_dict
 
     def _get_target_steps(self):
-        """Determines which final steps the user wants to run based on CLI flags."""
+        """
+        Determines which final steps the user wants to run based on CLI flags.
+        """
         targets = []
         if getattr(self.args, 'clip_video', False):
             targets.append(ClipVideoStep)
@@ -117,7 +120,7 @@ class Orchestrator:
         )
 
         if entry is None:
-            print(f"[INFO] Creating new manifest entry for {canonical_url}")
+            print(f"{Colors.INFO}[INFO]{Colors.RESET} Creating new manifest entry for {canonical_url}")
             entry_data = {"youtube_url": canonical_url, "base_filename": base_name}
             self.manifest_df = update_manifest_entry(
                 self.manifest_df, canonical_url, entry_data
@@ -131,10 +134,10 @@ class Orchestrator:
         # --- 2. Determine and Execute Target Steps ---
         target_steps = self._get_target_steps()
         if not target_steps:
-            print("[INFO] No processing steps were selected. Exiting.")
+            print(f"{Colors.INFO}[INFO]{Colors.RESET} No processing steps were selected. Exiting.")
             return
 
-        print(f"[INFO] Target steps: {[s.__name__ for s in target_steps]}")
+        print(f"{Colors.INFO}[INFO]{Colors.RESET} Target steps: {[s.__name__ for s in target_steps]}")
 
         for step_class in target_steps:
             entry_dict = self._execute_step(step_class, entry_dict)
@@ -144,11 +147,11 @@ class Orchestrator:
             self.manifest_df, canonical_url, entry_dict
         )
         save_manifest(self.manifest_df, self.manifest_path)
-        print(f"\n[SUCCESS] Orchestration complete for {canonical_url}.")
+        print(f"\n{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Orchestration complete for {canonical_url}.")
 
     def list_manifest(self):
         if self.manifest_df.empty:
-            print("[INFO] Manifest is empty.")
+            print(f"{Colors.INFO}[INFO]{Colors.RESET} Manifest is empty.")
             return
         print("\n--- Manifest Contents ---")
         with pd.option_context(
@@ -165,10 +168,10 @@ class Orchestrator:
 
         entry = get_manifest_entry(self.manifest_df, canonical_url)
         if entry is None:
-            print(f"[INFO] URL not found in manifest: {canonical_url}")
+            print(f"{Colors.INFO}[INFO]{Colors.RESET} URL not found in manifest: {canonical_url}")
             return
 
-        print(f"[INFO] Removing URL '{canonical_url}' and associated files.")
+        print(f"{Colors.INFO}[INFO]{Colors.RESET} Removing URL '{canonical_url}' and associated files.")
         base_name = entry.get('base_filename')
         potential_paths = [
             entry.get("video_path"),
@@ -190,15 +193,15 @@ class Orchestrator:
             if pd.notna(path) and os.path.exists(path):
                 try:
                     os.remove(path)
-                    print(f"[SUCCESS] Deleted file: {path}")
+                    print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Deleted file: {path}")
                 except OSError as e:
-                    print(f"[ERROR] Could not delete file {path}: {e}")
+                    print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Could not delete file {path}: {e}")
 
         self.manifest_df = self.manifest_df[
             self.manifest_df["youtube_url"] != canonical_url
         ].reset_index(drop=True)
         save_manifest(self.manifest_df, self.manifest_path)
-        print(f"[SUCCESS] Removed entry for {canonical_url} from manifest.")
+        print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Removed entry for {canonical_url} from manifest.")
 
 
 # --- CLI Entry Points ---

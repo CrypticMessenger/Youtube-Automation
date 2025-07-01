@@ -1,9 +1,8 @@
-
 import os
 import json
 import pandas as pd
 
-from .base import ProcessingStep
+from .base import ProcessingStep, Colors
 from gemini_interaction import get_viral_timestamps_gemini
 
 
@@ -24,10 +23,10 @@ class ViralTimestampsStep(ProcessingStep):
         analysis_path = self.entry.get("analysis_path")
 
         if pd.isna(srt_path) or not os.path.exists(srt_path):
-            print("[ERROR] SRT file not found for timestamp extraction.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} SRT file not found for timestamp extraction.")
             return self.entry
         if pd.isna(analysis_path) or not os.path.exists(analysis_path):
-            print("[ERROR] Analysis file not found for timestamp extraction.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Analysis file not found for timestamp extraction.")
             return self.entry
 
         with open(srt_path, "r", encoding="utf-8") as f:
@@ -43,7 +42,7 @@ class ViralTimestampsStep(ProcessingStep):
             os.makedirs(self.timestamps_dir, exist_ok=True)
             with open(self.timestamp_file_path, "w", encoding="utf-8") as f:
                 json.dump(timestamps_json, f, indent=4)
-            print(f"[SUCCESS] Viral timestamps saved to: {self.timestamp_file_path}")
+            print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Viral timestamps saved to: {self.timestamp_file_path}")
         else:
-            print("[ERROR] Could not retrieve viral timestamps.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Could not retrieve viral timestamps.")
         return self.entry

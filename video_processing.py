@@ -1,6 +1,8 @@
 import subprocess
 import os
 
+from processors.base import Colors
+
 def burn_subtitles(video_path, audio_path, ass_path, output_path):
     """Burns subtitles into a video using ffmpeg."""
     try:
@@ -21,10 +23,10 @@ def burn_subtitles(video_path, audio_path, ass_path, output_path):
         ]
         # Change to the directory of the ass file to ensure ffmpeg can find it.
         subprocess.run(command, check=True, cwd=os.path.dirname(ass_path))
-        print(f"[SUCCESS] Subtitles burned into video: {output_path}")
+        print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Subtitles burned into video: {output_path}")
         return output_path
     except subprocess.CalledProcessError as e:
-        print(f"[ERROR] ffmpeg subtitle burn failed: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} ffmpeg subtitle burn failed: {e}")
         return None
 
 def generate_video_with_captions(video_path, audio_path, ass_path, output_path):
@@ -42,8 +44,8 @@ def generate_video_with_captions(video_path, audio_path, ass_path, output_path):
             output_path
         ]
         subprocess.run(command, check=True, cwd=os.path.dirname(ass_path))
-        print(f"[SUCCESS] Generated video with captions: {output_path}")
+        print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Generated video with captions: {output_path}")
         return output_path
     except subprocess.CalledProcessError as e:
-        print(f"[ERROR] ffmpeg video generation failed: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} ffmpeg video generation failed: {e}")
         return None

@@ -1,8 +1,7 @@
-
 import os
 import pandas as pd
 
-from .base import ProcessingStep
+from .base import ProcessingStep, Colors
 from video_processing import generate_video_with_captions
 
 
@@ -26,14 +25,14 @@ class BurnVideoStep(ProcessingStep):
         )
 
         if pd.isna(video_path) or not os.path.exists(video_path):
-            print("[ERROR] Video file not available for burning subtitles.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Video file not available for burning subtitles.")
             return self.entry
 
         if pd.isna(audio_path) or not os.path.exists(audio_path):
-            print("[ERROR] Audio file not available for burning subtitles.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Audio file not available for burning subtitles.")
             return self.entry
         if not os.path.exists(ass_path):
-            print(f"[ERROR] ASS caption file not found at expected path: {ass_path}")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} ASS caption file not found at expected path: {ass_path}")
             return self.entry
 
         os.makedirs(self.burned_video_dir, exist_ok=True)
@@ -42,7 +41,7 @@ class BurnVideoStep(ProcessingStep):
         )
 
         if burned_path:
-            print(f"[SUCCESS] Video with burned subtitles created at: {burned_path}")
+            print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Video with burned subtitles created at: {burned_path}")
         else:
-            print("[ERROR] Failed to burn subtitles.")
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Failed to burn subtitles.")
         return self.entry

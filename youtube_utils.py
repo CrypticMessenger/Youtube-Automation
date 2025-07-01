@@ -2,6 +2,8 @@ import os
 import yt_dlp
 import pandas as pd
 
+from processors.base import Colors
+
 def get_sanitized_base_name(yt_title, custom_filename=None):
     if custom_filename:
         return "".join(
@@ -17,7 +19,7 @@ def get_video_info(url):
             info = ydl.extract_info(url, download=False)
             return info
     except Exception as e:
-        print(f"[ERROR] Could not fetch YouTube video details for {url}: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Could not fetch YouTube video details for {url}: {e}")
         return None
 
 def download_video(video_info, base_name_for_paths, effective_video_dir, video_quality_arg):
@@ -37,10 +39,10 @@ def download_video(video_info, base_name_for_paths, effective_video_dir, video_q
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
-        print(f"[SUCCESS] Video downloaded: {output_path}")
+        print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Video downloaded: {os.path.abspath(output_path)}")
         return os.path.abspath(output_path)
     except Exception as e:
-        print(f"[ERROR] Video download failed for {base_name_for_paths}: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Video download failed for {base_name_for_paths}: {e}")
         return None
 
 def download_audio_stream(video_info, base_name_for_paths, effective_audio_dir, audio_quality_arg):
@@ -58,10 +60,10 @@ def download_audio_stream(video_info, base_name_for_paths, effective_audio_dir, 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
-        print(f"[SUCCESS] Raw audio stream downloaded: {output_path}")
+        print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Raw audio stream downloaded: {os.path.abspath(output_path)}")
         return os.path.abspath(output_path)
     except Exception as e:
-        print(f"[ERROR] Raw audio stream download failed for {base_name_for_paths}: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Raw audio stream download failed for {base_name_for_paths}: {e}")
         return None
 
 def get_yt_object_and_canonical_url(input_url):
@@ -83,5 +85,5 @@ def get_video_duration(video_path):
         video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
         return float(video_info['duration'])
     except (ffmpeg.Error, StopIteration) as e:
-        print(f"Error getting duration for {video_path}: {e}")
+        print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Error getting duration for {video_path}: {e}")
         return None
