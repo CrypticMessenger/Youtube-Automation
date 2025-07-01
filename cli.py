@@ -69,11 +69,7 @@ def parse_arguments():
         default=None,
         help="Directory for analysis files (default: [OUTPUT]/viral_analysis)",
     )
-    process_parser.add_argument(
-        "--transcribe",
-        action="store_true",
-        help="Transcribe audio and save .txt transcript. (Uses stable-ts)",
-    )
+    
     process_parser.add_argument(
         "--viral-short-identifier",
         action="store_true",

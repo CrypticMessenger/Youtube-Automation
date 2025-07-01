@@ -16,7 +16,6 @@ from youtube_utils import (
 from processors import (
     VideoDownloadStep,
     AudioExtractionStep,
-    TranscriptionStep,
     CaptionGenerationStep,
     ViralAnalysisStep,
     ViralTimestampsStep,
@@ -29,10 +28,9 @@ from processors import (
 STEP_DEPENDENCIES = {
     ClipVideoStep: [BurnVideoStep, ViralTimestampsStep],
     BurnVideoStep: [VideoDownloadStep, CaptionGenerationStep],
-    ViralTimestampsStep: [CaptionGenerationStep, ViralAnalysisStep],
-    ViralAnalysisStep: [TranscriptionStep],
+    ViralTimestampsStep: [ViralAnalysisStep],
+    ViralAnalysisStep: [CaptionGenerationStep], # Changed dependency from TranscriptionStep
     CaptionGenerationStep: [AudioExtractionStep],
-    TranscriptionStep: [AudioExtractionStep],
     AudioExtractionStep: [VideoDownloadStep],
     VideoDownloadStep: [],
 }
@@ -41,8 +39,7 @@ STEP_DEPENDENCIES = {
 FULL_PIPELINE = [
     VideoDownloadStep,
     AudioExtractionStep,
-    TranscriptionStep,
-    CaptionGenerationStep,
+    CaptionGenerationStep, # Removed TranscriptionStep
     ViralAnalysisStep,
     ViralTimestampsStep,
     BurnVideoStep,
@@ -91,8 +88,6 @@ class Orchestrator:
             targets.append(ViralAnalysisStep)
         if getattr(self.args, 'generate_captions', False):
             targets.append(CaptionGenerationStep)
-        if getattr(self.args, 'transcribe', False):
-            targets.append(TranscriptionStep)
         if getattr(self.args, 'extract_audio', False):
             targets.append(AudioExtractionStep)
         if getattr(self.args, 'download_video', False):

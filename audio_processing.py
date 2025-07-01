@@ -64,73 +64,51 @@ def convert_to_mp3(input_path, output_mp3_path):
     return None
 
 
-def generate_caption_files(audio_path, output_dir, base_filename, model_name="tiny"):
-    """Generates caption files (.srt, .ass) using stable-whisper."""
+def generate_caption_files(audio_path, output_dir, base_filename, model_name="tiny", transcript_output_dir=None):
+    """Generates caption files (.srt, .ass) and optionally a transcript (.txt) using stable-whisper."""
     if not os.path.exists(audio_path):
         print(f"[ERROR] Audio file not found for caption generation: {audio_path}")
         return None
 
     print(
-        f"[INFO] Generating captions for {audio_path} using stable-whisper model '{model_name}'..."
+        f"[INFO] Generating captions and transcript for {audio_path} using stable-whisper model '{model_name}'..."
     )
     try:
         model = stable_whisper.load_model(model_name)
         os.makedirs(output_dir, exist_ok=True)
+        if transcript_output_dir:
+            os.makedirs(transcript_output_dir, exist_ok=True)
 
         result = model.transcribe(audio_path, fp16=False)
 
         srt_path = os.path.join(output_dir, f"{base_filename}.srt")
         ass_path = os.path.join(output_dir, f"{base_filename}.ass")
+        txt_path = os.path.join(transcript_output_dir, f"{base_filename}.txt") if transcript_output_dir else None
 
         result.to_srt_vtt(srt_path)
         result.to_ass(ass_path)
+        if txt_path:
+            result.to_txt(txt_path)
 
-        if os.path.exists(srt_path) and os.path.exists(ass_path):
-            print(f"[SUCCESS] Captions generated: {srt_path}, {ass_path}")
-            return {"srt": srt_path, "ass": ass_path}
+        generated_files = {}
+        if os.path.exists(srt_path):
+            generated_files["srt"] = srt_path
+        if os.path.exists(ass_path):
+            generated_files["ass"] = ass_path
+        if txt_path and os.path.exists(txt_path):
+            generated_files["txt"] = txt_path
+
+        if generated_files:
+            print(f"[SUCCESS] Generated files: {', '.join(generated_files.values())}")
+            return generated_files
         else:
             print(
-                f"[ERROR] stable-whisper did not generate expected caption files for {base_filename}."
+                f"[ERROR] stable-whisper did not generate any expected files for {base_filename}."
             )
             return None
 
     except Exception as e:
-        print(f"[ERROR] stable-whisper caption generation failed for {audio_path}: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return None
-
-
-def transcribe_audio_stable_ts(audio_path, output_dir, base_filename, model_name="tiny"):
-    """Transcribes audio to a .txt file using stable-whisper."""
-    if not os.path.exists(audio_path):
-        print(f"[ERROR] Audio file not found for transcription: {audio_path}")
-        return None
-
-    print(
-        f"[INFO] Transcribing {audio_path} using stable-whisper model '{model_name}'..."
-    )
-    try:
-        model = stable_whisper.load_model(model_name)
-        os.makedirs(output_dir, exist_ok=True)
-
-        result = model.transcribe(audio_path, fp16=False)
-
-        txt_path = os.path.join(output_dir, f"{base_filename}.txt")
-        result.to_txt(txt_path)
-
-        if os.path.exists(txt_path):
-            print(f"[SUCCESS] Transcript generated: {txt_path}")
-            return txt_path
-        else:
-            print(
-                f"[ERROR] stable-whisper did not generate expected transcript file for {base_filename}."
-            )
-            return None
-
-    except Exception as e:
-        print(f"[ERROR] stable-whisper transcription failed for {audio_path}: {e}")
+        print(f"[ERROR] stable-whisper caption/transcript generation failed for {audio_path}: {e}")
         import traceback
 
         traceback.print_exc()

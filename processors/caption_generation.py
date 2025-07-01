@@ -1,4 +1,3 @@
-
 import os
 import pandas as pd
 
@@ -13,6 +12,8 @@ class CaptionGenerationStep(ProcessingStep):
             self.entry.get("status_captions_generated") is True
             and pd.notna(self.entry.get("caption_srt_path"))
             and os.path.exists(self.entry.get("caption_srt_path"))
+            and pd.notna(self.entry.get("transcript_path"))
+            and os.path.exists(self.entry.get("transcript_path"))
         )
 
     def process(self):
@@ -20,14 +21,18 @@ class CaptionGenerationStep(ProcessingStep):
         if pd.isna(mp3_path) or not os.path.exists(mp3_path):
             print("[ERROR] MP3 file not available for caption generation.")
             self.entry["status_captions_generated"] = False
+            self.entry["status_transcript_generated"] = False
             return self.entry
 
         os.makedirs(self.args.effective_caption_dir, exist_ok=True)
+        os.makedirs(self.args.effective_transcript_dir, exist_ok=True)
+
         caption_paths = generate_caption_files(
             mp3_path,
             self.args.effective_caption_dir,
             self.base_name,
             self.args.whisper_model,
+            self.args.effective_transcript_dir, # Pass transcript dir
         )
 
         if caption_paths and "srt" in caption_paths:
@@ -36,4 +41,12 @@ class CaptionGenerationStep(ProcessingStep):
         else:
             self.entry["caption_srt_path"] = pd.NA
             self.entry["status_captions_generated"] = False
+
+        if caption_paths and "txt" in caption_paths:
+            self.entry["transcript_path"] = caption_paths.get("txt")
+            self.entry["status_transcript_generated"] = True
+        else:
+            self.entry["transcript_path"] = pd.NA
+            self.entry["status_transcript_generated"] = False
+
         return self.entry
