@@ -54,9 +54,9 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): 
     Your ultimate objective is to provide me with ready-to-trim goldmines from my transcript that have the highest probability of becoming highly watchable, shareable, and viral short-form content.
     Now, please analyze the following YouTube video transcript:
 
-    """
+    \"\"\"
     {transcript_text}
-    """
+    \"\"\"
 
     Key considerations for you, the AI, when processing:
     Inferring from Text: Since you only have text, you'll need to infer pacing, emphasis, and potential visual accompaniments based on the language used.
@@ -178,14 +178,14 @@ def get_viral_timestamps_prompt_text(srt_content, analysis_content):
     ```
 
     Here is the SRT file content:
-    """
+    \"\"\"
     {srt_content}
-    """
+    \"\"\"
 
     Here is the viral clip analysis:
-    """
+    \"\"\"
     {analysis_content}
-    """
+    \"\"\"
 
     Now, provide the JSON output with the exact timestamps.
     """
