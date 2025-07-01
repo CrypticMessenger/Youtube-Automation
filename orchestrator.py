@@ -1,863 +1,220 @@
 import os
-import pandas as pd # For pd.NA and type hints
-import json
+import pandas as pd
 
-
-# Import from our new modules
 from manifest import (
+    load_manifest,
+    save_manifest,
     get_manifest_entry,
     update_manifest_entry,
-    save_manifest,
-    # MANIFEST_COLUMNS, # Not directly used here but good to be aware of
+    DEFAULT_MANIFEST_FILE,
 )
 from youtube_utils import (
     get_sanitized_base_name,
-    download_video,
-    download_audio_stream,
     get_yt_object_and_canonical_url,
     get_video_info,
 )
-from audio_processing import convert_to_mp3, generate_caption_files
-from gemini_interaction import (
-    identify_viral_clips_gemini,
-    get_viral_timestamps_gemini,
+from processors import (
+    VideoDownloadStep,
+    AudioExtractionStep,
+    TranscriptionStep,
+    CaptionGenerationStep,
+    ViralAnalysisStep,
+    ViralTimestampsStep,
+    BurnVideoStep,
+    ClipVideoStep,
 )
-from audio_processing import transcribe_audio_stable_ts
-from video_processing import burn_subtitles, generate_video_with_captions
+
+# --- Dependency Graph Definition ---
+
+STEP_DEPENDENCIES = {
+    ClipVideoStep: [BurnVideoStep, ViralTimestampsStep],
+    BurnVideoStep: [VideoDownloadStep, CaptionGenerationStep],
+    ViralTimestampsStep: [CaptionGenerationStep, ViralAnalysisStep],
+    ViralAnalysisStep: [TranscriptionStep],
+    CaptionGenerationStep: [AudioExtractionStep],
+    TranscriptionStep: [AudioExtractionStep],
+    AudioExtractionStep: [VideoDownloadStep],
+    VideoDownloadStep: [],
+}
+
+# The full pipeline in a reasonable execution order for a full run.
+FULL_PIPELINE = [
+    VideoDownloadStep,
+    AudioExtractionStep,
+    TranscriptionStep,
+    CaptionGenerationStep,
+    ViralAnalysisStep,
+    ViralTimestampsStep,
+    BurnVideoStep,
+    ClipVideoStep,
+]
 
 
-def process_youtube_url(args, manifest_df, manifest_path):
-    input_url_arg = args.url
-    force_processing = args.force
+class Orchestrator:
+    def __init__(self, args):
+        self.args = args
+        self.manifest_path = os.path.join(args.output, DEFAULT_MANIFEST_FILE)
+        self.manifest_df = load_manifest(self.manifest_path)
+        self.completed_steps = set()
 
-    yt, canonical_url = get_yt_object_and_canonical_url(input_url_arg)
-    if not yt:
-        return manifest_df # Error already printed
+    def _execute_step(self, step_class, entry_dict):
+        """
+        Executes a single step, ensuring its dependencies are met first.
+        Uses a set `self.completed_steps` to avoid re-running steps in the same session.
+        """
+        if step_class in self.completed_steps:
+            return entry_dict
 
-    video_info = get_video_info(canonical_url)
-    if not video_info:
-        return manifest_df # Error already printed
+        # --- 1. Resolve Dependencies First ---
+        dependencies = STEP_DEPENDENCIES.get(step_class, [])
+        for dep_class in dependencies:
+            entry_dict = self._execute_step(dep_class, entry_dict)
 
-    current_base_name = get_sanitized_base_name(video_info.get('title', 'default_title'), args.filename)
-    print(f"[INFO] Processing URL: {input_url_arg} (Canonical: {canonical_url})")
+        # --- 2. Execute the Current Step ---
+        step = step_class(entry_dict, self.args)
+        entry_dict = step.run()
 
-    entry = get_manifest_entry(manifest_df, canonical_url)
+        # --- 3. Mark as Complete ---
+        self.completed_steps.add(step_class)
+        return entry_dict
 
-    if entry is None:
-        print(
-            f"[INFO] No existing manifest entry for {canonical_url}. Creating new one."
+    def _get_target_steps(self):
+        """Determines which final steps the user wants to run based on CLI flags."""
+        targets = []
+        if getattr(self.args, 'clip_video', False):
+            targets.append(ClipVideoStep)
+        if getattr(self.args, 'burn_video', False):
+            targets.append(BurnVideoStep)
+        if getattr(self.args, 'get_viral_timestamps', False):
+            targets.append(ViralTimestampsStep)
+        if getattr(self.args, 'viral_short_identifier', False):
+            targets.append(ViralAnalysisStep)
+        if getattr(self.args, 'generate_captions', False):
+            targets.append(CaptionGenerationStep)
+        if getattr(self.args, 'transcribe', False):
+            targets.append(TranscriptionStep)
+        if getattr(self.args, 'extract_audio', False):
+            targets.append(AudioExtractionStep)
+        if getattr(self.args, 'download_video', False):
+            targets.append(VideoDownloadStep)
+
+        # If no specific flags are given, run the entire pipeline.
+        if not targets:
+            return FULL_PIPELINE
+        return targets
+
+    def process_url(self, url):
+        """
+        Processes a YouTube URL by executing the requested steps and their dependencies.
+        """
+        _, canonical_url = get_yt_object_and_canonical_url(url)
+        if not canonical_url:
+            return
+
+        video_info = get_video_info(canonical_url)
+        if not video_info:
+            return
+
+        # --- 1. Get or Create Manifest Entry ---
+        entry = get_manifest_entry(self.manifest_df, canonical_url)
+        base_name = get_sanitized_base_name(
+            video_info.get("title", "default_title"), self.args.filename
         )
-        manifest_df = update_manifest_entry(
-            manifest_df,
-            canonical_url,
-            {"base_filename": current_base_name, "youtube_url": canonical_url},
-        )
-        entry = get_manifest_entry(manifest_df, canonical_url)
+
         if entry is None:
-            print(
-                f"[CRITICAL_ERROR] Failed to create or retrieve new manifest entry for {canonical_url}. Aborting processing for this URL."
+            print(f"[INFO] Creating new manifest entry for {canonical_url}")
+            entry_data = {"youtube_url": canonical_url, "base_filename": base_name}
+            self.manifest_df = update_manifest_entry(
+                self.manifest_df, canonical_url, entry_data
             )
-            return manifest_df
-
-    manifest_base_name = entry.get("base_filename")
-    if pd.isna(manifest_base_name) or not str(manifest_base_name).strip():
-        print(
-            f"[INFO] base_filename missing or empty in manifest for {canonical_url}. Using current: {current_base_name}"
-        )
-        manifest_df = update_manifest_entry(
-            manifest_df, canonical_url, {"base_filename": current_base_name}
-        )
-        entry = get_manifest_entry(manifest_df, canonical_url)
-        base_name_for_paths = current_base_name
-    else:
-        if args.filename and args.filename != manifest_base_name:
-            print(
-                f"[WARNING] Custom filename '{args.filename}' provided, but manifest has '{manifest_base_name}' for {canonical_url}."
-            )
-            print(
-                f"         Using manifest base_filename '{manifest_base_name}' to locate existing files."
-            )
-        base_name_for_paths = manifest_base_name
-
-    # Base name for paths is now determined.
-
-    # --- 1. Video Download ---
-    video_download_path_from_manifest = entry.get("video_path")
-    video_status_from_manifest = entry.get("status_video_downloaded")
-    video_download_path_to_use = None
-
-    # Cache check logic for video download.
-    if not args.audio: # Not in audio-only mode
-        if (
-            not force_processing
-            and video_status_from_manifest is True # Explicitly check for True
-            and pd.notna(video_download_path_from_manifest)
-            and str(video_download_path_from_manifest).strip()
-            and os.path.exists(str(video_download_path_from_manifest))
-        ):
-            print(f"[CACHE] Using existing video: {video_download_path_from_manifest}")
-            video_download_path_to_use = str(video_download_path_from_manifest)
+            entry = get_manifest_entry(self.manifest_df, canonical_url)
         else:
-            if video_status_from_manifest is True and (
-                not pd.notna(video_download_path_from_manifest)
-                or not str(video_download_path_from_manifest).strip()
-                or not os.path.exists(str(video_download_path_from_manifest))
-            ):
-                print(
-                    f"[INFO] Video status was True, but file missing/path invalid. Re-downloading for {base_name_for_paths}."
-                )
-            elif force_processing:
-                print(f"[INFO] Force processing video for {base_name_for_paths}.")
-            else:
-                print(f"[INFO] Attempting to download video: {base_name_for_paths}")
+            entry["base_filename"] = base_name
 
-            downloaded_path = download_video(video_info, base_name_for_paths, args.effective_video_dir, args.video_quality)
+        entry_dict = entry.to_dict()
 
-            if downloaded_path:
-                video_download_path_to_use = downloaded_path
-                manifest_df = update_manifest_entry(
-                    manifest_df,
-                    canonical_url,
-                    {
-                        "video_path": video_download_path_to_use,
-                        "status_video_downloaded": True,
-                    },
-                )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-            else:
-                video_download_path_to_use = None
-                manifest_df = update_manifest_entry(
-                    manifest_df,
-                    canonical_url,
-                    {"video_path": pd.NA, "status_video_downloaded": False},
-                )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-            save_manifest(manifest_df, manifest_path)
-    else:  # audio-only mode
-        video_download_path_to_use = None # Ensure it's None
-        if video_status_from_manifest is not False or pd.notna(video_download_path_from_manifest):
-            manifest_df = update_manifest_entry(
-                manifest_df,
-                canonical_url,
-                {"video_path": pd.NA, "status_video_downloaded": False},
-            )
-            entry = get_manifest_entry(manifest_df, canonical_url)
-            save_manifest(manifest_df, manifest_path)
+        # --- 2. Determine and Execute Target Steps ---
+        target_steps = self._get_target_steps()
+        if not target_steps:
+            print("[INFO] No processing steps were selected. Exiting.")
+            return
 
-    # --- 2. MP3 Conversion ---
-    mp3_path_from_manifest = entry.get("mp3_path")
-    mp3_status_from_manifest = entry.get("status_mp3_converted")
-    needs_mp3 = args.audio or args.transcribe or args.viral_short_identifier or args.generate_captions
-    mp3_file_for_processing = None
+        print(f"[INFO] Target steps: {[s.__name__ for s in target_steps]}")
 
-    # Cache check logic for MP3 conversion.
-    if needs_mp3:
-        # --- Improved Cache Logic ---
-        # Default to manifest path if valid
-        if (
-            not force_processing
-            and mp3_status_from_manifest is True
-            and pd.notna(mp3_path_from_manifest)
-            and str(mp3_path_from_manifest).strip()
-            and os.path.exists(str(mp3_path_from_manifest))
+        for step_class in target_steps:
+            entry_dict = self._execute_step(step_class, entry_dict)
+
+        # --- 3. Save Final Manifest ---
+        self.manifest_df = update_manifest_entry(
+            self.manifest_df, canonical_url, entry_dict
+        )
+        save_manifest(self.manifest_df, self.manifest_path)
+        print(f"\n[SUCCESS] Orchestration complete for {canonical_url}.")
+
+    def list_manifest(self):
+        if self.manifest_df.empty:
+            print("[INFO] Manifest is empty.")
+            return
+        print("\n--- Manifest Contents ---")
+        with pd.option_context(
+            "display.max_colwidth", 50, "display.width", 1000, "display.max_rows", 25
         ):
-            print(f"[CACHE] Using existing MP3 from manifest: {mp3_path_from_manifest}")
-            mp3_file_for_processing = str(mp3_path_from_manifest)
-        else:
-            # Fallback to check expected path
-            expected_mp3_path = os.path.join(args.effective_audio_dir, base_name_for_paths + ".mp3")
-            if not force_processing and os.path.exists(expected_mp3_path):
-                print(f"[CACHE] Found existing MP3 at expected path, updating manifest: {expected_mp3_path}")
-                mp3_file_for_processing = os.path.abspath(expected_mp3_path)
-                manifest_df = update_manifest_entry(
-                    manifest_df,
-                    canonical_url,
-                    {
-                        "mp3_path": mp3_file_for_processing,
-                        "status_mp3_converted": True,
-                    },
-                )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
+            display_cols = [col for col in self.manifest_df.columns]
+            print(self.manifest_df[display_cols].head(20).to_string())
+        print(f"--- Total entries: {len(self.manifest_df)} ---")
 
-        # If after all checks, we still don't have a file, generate it.
-        if not mp3_file_for_processing:
-            if mp3_status_from_manifest is True and (
-                not pd.notna(mp3_path_from_manifest)
-                or not str(mp3_path_from_manifest).strip()
-                or not os.path.exists(str(mp3_path_from_manifest))
-            ):
-                print(
-                    f"[INFO] MP3 status was True, but file missing/path invalid. Re-processing MP3 for {base_name_for_paths}."
-                )
-            elif force_processing:
-                print(f"[INFO] Force processing MP3 for {base_name_for_paths}.")
+    def remove_url(self, url_to_remove):
+        _, canonical_url = get_yt_object_and_canonical_url(url_to_remove)
+        if not canonical_url:
+            canonical_url = url_to_remove
 
-            source_for_ffmpeg = None
-            if (
-                not args.audio # Not audio-only, so video *might* exist
-                and video_download_path_to_use # Check if video was successfully obtained
-                and os.path.exists(video_download_path_to_use)
-            ):
-                print(
-                    f"[INFO] Using downloaded video as source for MP3: {video_download_path_to_use}"
-                )
-                source_for_ffmpeg = video_download_path_to_use
-            else: # Audio-only mode, or video download failed/skipped
-                print("[INFO] Attempting to download dedicated audio stream for MP3 conversion...")
-                raw_audio_input_path = download_audio_stream(video_info, base_name_for_paths, args.effective_audio_dir, args.audio_quality)
-                if raw_audio_input_path:
-                    source_for_ffmpeg = raw_audio_input_path
-                else:
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {"mp3_path": pd.NA, "status_mp3_converted": False},
-                    )
-                    entry = get_manifest_entry(manifest_df, canonical_url)
-                    save_manifest(manifest_df, manifest_path) # Save state and potentially skip next steps
+        entry = get_manifest_entry(self.manifest_df, canonical_url)
+        if entry is None:
+            print(f"[INFO] URL not found in manifest: {canonical_url}")
+            return
 
-            if source_for_ffmpeg:
-                os.makedirs(args.effective_audio_dir, exist_ok=True)
-                final_mp3_path_target = os.path.join(
-                    args.effective_audio_dir, base_name_for_paths + ".mp3"
-                )
-                converted_mp3_path = convert_to_mp3(
-                    source_for_ffmpeg, final_mp3_path_target
-                )
-                if converted_mp3_path:
-                    mp3_file_for_processing = os.path.abspath(converted_mp3_path)
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {
-                            "mp3_path": mp3_file_for_processing,
-                            "status_mp3_converted": True,
-                        },
-                    )
-                else:
-                    print(f"[ERROR] MP3 conversion failed for {canonical_url}.")
-                    mp3_file_for_processing = None
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {"mp3_path": pd.NA, "status_mp3_converted": False},
-                    )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-            save_manifest(manifest_df, manifest_path)
+        print(f"[INFO] Removing URL '{canonical_url}' and associated files.")
+        base_name = entry.get('base_filename')
+        potential_paths = [
+            entry.get("video_path"),
+            entry.get("mp3_path"),
+            entry.get("transcript_path"),
+            entry.get("analysis_path"),
+            entry.get("caption_srt_path"),
+            os.path.join(self.args.output, "captioned_videos", f"{base_name}_captioned.mp4"),
+            os.path.join(self.args.output, "viral_clip_timestamps", f"{base_name}_timestamps.json"),
+        ]
+        # Also remove generated clips
+        clips_dir = os.path.join(self.args.output, "viral_clips")
+        if os.path.exists(clips_dir):
+            for f in os.listdir(clips_dir):
+                if f.startswith(base_name):
+                    potential_paths.append(os.path.join(clips_dir, f))
 
-    else: # If MP3 processing is not needed
-        if mp3_status_from_manifest is not False or pd.notna(mp3_path_from_manifest): # If not needed, but manifest had info
-            manifest_df = update_manifest_entry(
-                manifest_df,
-                canonical_url,
-                {"mp3_path": pd.NA, "status_mp3_converted": False},
-            )
-            entry = get_manifest_entry(manifest_df, canonical_url)
-            save_manifest(manifest_df, manifest_path)
-
-    # --- 3. Transcription ---
-    transcript_content = None # Store content if loaded or generated
-    transcript_path_from_manifest = entry.get("transcript_path")
-    transcript_status_from_manifest = entry.get("status_transcript_generated")
-    needs_transcription = args.transcribe or args.viral_short_identifier
-
-    # Cache check logic for transcription.
-    if needs_transcription:
-        if mp3_file_for_processing and os.path.exists(mp3_file_for_processing):
-            cached_transcript_valid_and_present = False
-            should_transcribe = False
-            if (
-                not force_processing
-                and transcript_status_from_manifest is True
-                and pd.notna(transcript_path_from_manifest)
-                and str(transcript_path_from_manifest).strip()
-                and os.path.exists(str(transcript_path_from_manifest))
-            ):
-                print(
-                    f"[CACHE] Loading transcript from: {transcript_path_from_manifest}"
-                )
+        for path in potential_paths:
+            if pd.notna(path) and os.path.exists(path):
                 try:
-                    with open(
-                        str(transcript_path_from_manifest), "r", encoding="utf-8"
-                    ) as f:
-                        transcript_content = f.read()
-                    if transcript_content.strip():
-                        cached_transcript_valid_and_present = True
-                    else:
-                        print(
-                            f"[WARNING] Cached transcript file {transcript_path_from_manifest} is empty. Will re-transcribe."
-                        )
-                        transcript_content = None
-                        manifest_df = update_manifest_entry(
-                            manifest_df,
-                            canonical_url,
-                            {"status_transcript_generated": False}, # Keep path, but mark status false
-                        )
-                        entry = get_manifest_entry(manifest_df, canonical_url)
-                except Exception as e:
-                    print(
-                        f"[ERROR] Failed to read cached transcript {transcript_path_from_manifest}: {e}"
-                    )
-                    transcript_content = None
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {
-                            "status_transcript_generated": False,
-                            "transcript_path": pd.NA,
-                        },
-                    )
-                    entry = get_manifest_entry(manifest_df, canonical_url)
-
-            if not cached_transcript_valid_and_present:
-                if transcript_status_from_manifest is True and (
-                    not pd.notna(transcript_path_from_manifest)
-                    or not str(transcript_path_from_manifest).strip()
-                    or not os.path.exists(str(transcript_path_from_manifest))
-                ):
-                    print(
-                        f"[INFO] Transcript status was True, but file/path invalid or content empty. Re-transcribing for {base_name_for_paths}."
-                    )
-                    should_transcribe = True
-                elif force_processing:
-                    print(
-                        f"[INFO] Force processing transcription for {base_name_for_paths}."
-                    )
-                    should_transcribe = True
-                elif transcript_content is None: # Only transcribe if content is still None after cache check
-                    should_transcribe = True
-
-            if should_transcribe:
-                print("[INFO] Performing audio transcription...")
-                os.makedirs(args.effective_transcript_dir, exist_ok=True)
-                print("[INFO] Performing stable-ts audio transcription...")
-                new_transcript_path = transcribe_audio_stable_ts(
-                    mp3_file_for_processing,
-                    args.effective_transcript_dir,
-                    base_name_for_paths,
-                    args.whisper_model,
-                )
-                if new_transcript_path and os.path.exists(new_transcript_path):
-                    with open(new_transcript_path, "r", encoding="utf-8") as f:
-                        transcript_content = f.read()
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {
-                            "transcript_path": os.path.abspath(new_transcript_path),
-                            "status_transcript_generated": True,
-                        },
-                    )
-                else:
-                    transcript_content = None
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {
-                            "transcript_path": pd.NA,
-                            "status_transcript_generated": False,
-                        },
-                    )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
-        else:
-            print(
-                "[WARNING] MP3 not available or path invalid, skipping transcription."
-            )
-            if transcript_status_from_manifest is not False or pd.notna(transcript_path_from_manifest):
-                manifest_df = update_manifest_entry(
-                    manifest_df,
-                    canonical_url,
-                    {"transcript_path": pd.NA, "status_transcript_generated": False},
-                )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
-    else: # If transcription is not needed
-        if transcript_status_from_manifest is not False or pd.notna(transcript_path_from_manifest):
-            manifest_df = update_manifest_entry(
-                manifest_df,
-                canonical_url,
-                {"transcript_path": pd.NA, "status_transcript_generated": False},
-            )
-            entry = get_manifest_entry(manifest_df, canonical_url)
-            save_manifest(manifest_df, manifest_path)
-
-
-    # --- 4. Viral Clip Analysis ---
-    analysis_path_from_manifest = entry.get("analysis_path")
-    analysis_status_from_manifest = entry.get("status_analysis_generated")
-
-    # Cache check logic for viral clip analysis.
-    if args.viral_short_identifier:
-        cached_analysis_valid_and_present = False
-        if (
-            not force_processing
-            and analysis_status_from_manifest is True
-            and pd.notna(analysis_path_from_manifest)
-            and str(analysis_path_from_manifest).strip()
-            and os.path.exists(str(analysis_path_from_manifest))
-        ):
-            try:
-                if os.path.getsize(str(analysis_path_from_manifest)) > 0:
-                    print(
-                        f"[CACHE] Using existing analysis: {analysis_path_from_manifest}"
-                    )
-                    cached_analysis_valid_and_present = True
-                else:
-                    print(
-                        f"[WARNING] Cached analysis file {analysis_path_from_manifest} is empty. Will re-analyze."
-                    )
-                    manifest_df = update_manifest_entry(
-                        manifest_df, canonical_url, {"status_analysis_generated": False} # Keep path, mark status false
-                    )
-                    entry = get_manifest_entry(manifest_df, canonical_url)
-            except OSError:
-                print(
-                    f"[WARNING] Could not check size of cached analysis file {analysis_path_from_manifest}. Assuming invalid."
-                )
-                cached_analysis_valid_and_present = False # Ensure it's false
-
-        if transcript_content and transcript_content.strip(): # Check if we have transcript content
-            if not cached_analysis_valid_and_present:
-                if analysis_status_from_manifest is True and (
-                     not pd.notna(analysis_path_from_manifest)
-                    or not str(analysis_path_from_manifest).strip()
-                    or not os.path.exists(str(analysis_path_from_manifest))
-                    # or cached_analysis_valid_and_present was False due to empty file (implicitly handled by not cached_analysis_valid_and_present)
-                ):
-                    print(
-                        f"[INFO] Analysis status was True, but file/path invalid or content empty. Re-analyzing for {base_name_for_paths}."
-                    )
-                elif force_processing:
-                    print(
-                        f"[INFO] Force processing analysis for {base_name_for_paths}."
-                    )
-
-                print("[INFO] Performing viral clip analysis...")
-                os.makedirs(args.effective_analysis_dir, exist_ok=True)
-                generated_analysis_path = identify_viral_clips_gemini(
-                    transcript_content, # Use the obtained transcript content
-                    args.number_of_sections,
-                    args.clip_identifier_model,
-                    args.effective_analysis_dir,
-                    base_name_for_paths,
-                )
-                abs_analysis_path = pd.NA
-                analysis_content_exists = False
-                if generated_analysis_path and os.path.exists(generated_analysis_path):
-                    abs_analysis_path = os.path.abspath(generated_analysis_path)
-                    try:
-                        if os.path.getsize(abs_analysis_path) > 0:
-                            analysis_content_exists = True
-                    except OSError:
-                        pass
-
-                manifest_df = update_manifest_entry(
-                    manifest_df,
-                    canonical_url,
-                    {
-                        "analysis_path": abs_analysis_path,
-                        "status_analysis_generated": (
-                            True
-                            if pd.notna(abs_analysis_path) and analysis_content_exists
-                            else False
-                        ),
-                    },
-                )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
-        else:
-            print(
-                "[WARNING] Transcript not available or empty, skipping viral clip analysis."
-            )
-            if analysis_status_from_manifest is not False or pd.notna(analysis_path_from_manifest):
-                manifest_df = update_manifest_entry(
-                    manifest_df,
-                    canonical_url,
-                    {"analysis_path": pd.NA, "status_analysis_generated": False},
-                )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
-    else: # If viral short identification is not needed
-        if analysis_status_from_manifest is not False or pd.notna(analysis_path_from_manifest):
-            manifest_df = update_manifest_entry(
-                manifest_df,
-                canonical_url,
-                {"analysis_path": pd.NA, "status_analysis_generated": False},
-            )
-            entry = get_manifest_entry(manifest_df, canonical_url)
-            save_manifest(manifest_df, manifest_path)
-
-    # --- 5. Caption Generation ---
-    caption_srt_path_from_manifest = entry.get("caption_srt_path")
-    caption_ass_path_from_manifest = entry.get("caption_ass_path")
-    caption_status_from_manifest = entry.get("status_captions_generated")
-
-    if args.generate_captions:
-        cached_captions_valid_and_present = False
-        # --- Improved Cache Logic ---
-        # Default to manifest path if valid
-        if (
-            not force_processing
-            and caption_status_from_manifest is True
-            and pd.notna(caption_srt_path_from_manifest)
-            and os.path.exists(str(caption_srt_path_from_manifest))
-            and pd.notna(caption_ass_path_from_manifest)
-            and os.path.exists(str(caption_ass_path_from_manifest))
-        ):
-            print(f"[CACHE] Using existing captions from manifest: {caption_srt_path_from_manifest}, etc.")
-            cached_captions_valid_and_present = True
-        else:
-            # Fallback to check expected paths
-            expected_srt_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".srt")
-            expected_ass_path = os.path.join(args.effective_caption_dir, base_name_for_paths + ".ass")
-            if (
-                not force_processing and
-                os.path.exists(expected_srt_path) and
-                os.path.exists(expected_ass_path)
-            ):
-                print(f"[CACHE] Found existing caption files at expected paths, updating manifest: {args.effective_caption_dir}")
-                manifest_df = update_manifest_entry(
-                    manifest_df,
-                    canonical_url,
-                    {
-                        "caption_srt_path": os.path.abspath(expected_srt_path),
-                        "caption_ass_path": os.path.abspath(expected_ass_path),
-                        "status_captions_generated": True,
-                    },
-                )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
-                cached_captions_valid_and_present = True
-
-        if not cached_captions_valid_and_present:
-            if caption_status_from_manifest is True and (
-                not pd.notna(caption_srt_path_from_manifest)
-                or not os.path.exists(str(caption_srt_path_from_manifest))
-                or not pd.notna(caption_ass_path_from_manifest)
-                or not os.path.exists(str(caption_ass_path_from_manifest))
-            ):
-                print(
-                    f"[INFO] Caption status was True, but files missing/path invalid. Re-generating captions for {base_name_for_paths}."
-                )
-            elif force_processing:
-                print(f"[INFO] Force processing captions for {base_name_for_paths}.")
-
-        if mp3_file_for_processing and os.path.exists(mp3_file_for_processing):
-            if not cached_captions_valid_and_present:
-                print("[INFO] Generating caption files...")
-                os.makedirs(args.effective_caption_dir, exist_ok=True)
-                caption_paths = generate_caption_files(
-                    mp3_file_for_processing,
-                    args.effective_caption_dir,
-                    base_name_for_paths,
-                    args.whisper_model,
-                )
-                if caption_paths:
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {
-                            "caption_srt_path": os.path.abspath(caption_paths["srt"]),
-                            "caption_ass_path": os.path.abspath(caption_paths["ass"]),
-                            "status_captions_generated": True,
-                        },
-                    )
-                else:
-                    print(f"[ERROR] Caption generation failed for {canonical_url}.")
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {
-                            "caption_srt_path": pd.NA,
-                            "caption_ass_path": pd.NA,
-                            "status_captions_generated": False,
-                        },
-                    )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
-        else:
-            print("[WARNING] MP3 not available or path invalid, skipping caption generation.")
-            if caption_status_from_manifest is not False or pd.notna(caption_srt_path_from_manifest):
-                manifest_df = update_manifest_entry(
-                    manifest_df,
-                    canonical_url,
-                    {
-                        "caption_srt_path": pd.NA,
-                        "caption_ass_path": pd.NA,
-                        "status_captions_generated": False,
-                    },
-                )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
-    else: # If caption generation is not needed
-        if caption_status_from_manifest is not False or pd.notna(caption_srt_path_from_manifest):
-            manifest_df = update_manifest_entry(
-                manifest_df,
-                canonical_url,
-                {
-                    "caption_srt_path": pd.NA,
-                    "caption_ass_path": pd.NA,
-                    "status_captions_generated": False,
-                },
-            )
-            entry = get_manifest_entry(manifest_df, canonical_url)
-            save_manifest(manifest_df, manifest_path)
-
-    # --- 6. Burn Subtitles ---
-    burned_video_path_from_manifest = entry.get("burned_video_path")
-    burned_video_status_from_manifest = entry.get("status_burned_video_generated")
-
-    if args.get_viral_timestamps:
-        print("[INFO] Getting viral timestamps...")
-        srt_path = entry.get("caption_srt_path")
-        analysis_path = entry.get("analysis_path")
-
-        if pd.isna(srt_path) or not os.path.exists(srt_path):
-            print("[ERROR] SRT file not found. Please generate captions first.")
-            return manifest_df
-        if pd.isna(analysis_path) or not os.path.exists(analysis_path):
-            print("[ERROR] Analysis file not found. Please run viral short identification first.")
-            return manifest_df
-
-        with open(srt_path, "r", encoding="utf-8") as f:
-            srt_content = f.read()
-        with open(analysis_path, "r", encoding="utf-8") as f:
-            analysis_content = f.read()
-
-        timestamps_json = get_viral_timestamps_gemini(
-            srt_content,
-            analysis_content,
-            args.clip_identifier_model,
-        )
-
-        if timestamps_json:
-            try:
-                base_output_dir = os.path.abspath(args.output)
-                timestamps_dir = os.path.join(base_output_dir, "viral_clip_timestamps")
-                os.makedirs(timestamps_dir, exist_ok=True)
-
-                timestamp_file_path = os.path.join(
-                    timestamps_dir, f"{base_name_for_paths}_timestamps.json"
-                )
-
-                with open(timestamp_file_path, "w", encoding="utf-8") as f:
-                    json.dump(timestamps_json, f, indent=4)
-
-                print(
-                    f"[SUCCESS] Viral timestamps identified and saved to: {timestamp_file_path}"
-                )
-                print(json.dumps(timestamps_json, indent=2))
-
-            except Exception as e:
-                print(f"[ERROR] Could not save viral timestamps to file: {e}")
-                print("[SUCCESS] Viral timestamps identified (but not saved):")
-                print(json.dumps(timestamps_json, indent=2))
-        else:
-            print("[ERROR] Could not retrieve viral timestamps.")
-
-    if args.burn_subtitles:
-        cached_burned_video_valid_and_present = False
-        if (
-            not force_processing
-            and burned_video_status_from_manifest is True
-            and pd.notna(burned_video_path_from_manifest)
-            and str(burned_video_path_from_manifest).strip()
-            and os.path.exists(str(burned_video_path_from_manifest))
-        ):
-            print(f"[CACHE] Using existing burned video from manifest: {burned_video_path_from_manifest}")
-            cached_burned_video_valid_and_present = True
-        
-        if not cached_burned_video_valid_and_present:
-            if burned_video_status_from_manifest is True and (
-                not pd.notna(burned_video_path_from_manifest)
-                or not os.path.exists(str(burned_video_path_from_manifest))
-            ):
-                print(
-                    f"[INFO] Burned video status was True, but file missing/path invalid. Re-generating for {base_name_for_paths}."
-                )
-            elif force_processing:
-                print(f"[INFO] Force processing burned video for {base_name_for_paths}.")
-
-            video_path = entry.get("video_path")
-            mp3_path = entry.get("mp3_path")
-            ass_path = entry.get("caption_ass_path")
-
-            if video_path and mp3_path and ass_path and os.path.exists(video_path) and os.path.exists(mp3_path) and os.path.exists(ass_path):
-                print("[INFO] Burning subtitles into video...")
-                os.makedirs(args.effective_burned_video_dir, exist_ok=True)
-                output_path = os.path.join(args.effective_burned_video_dir, base_name_for_paths + "_burned.mp4")
-                burned_path = burn_subtitles(
-                    video_path,
-                    mp3_path,
-                    ass_path,
-                    output_path,
-                )
-                if burned_path:
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {
-                            "burned_video_path": os.path.abspath(burned_path),
-                            "status_burned_video_generated": True,
-                        },
-                    )
-                else:
-                    print(f"[ERROR] Subtitle burn failed for {canonical_url}.")
-                    manifest_df = update_manifest_entry(
-                        manifest_df,
-                        canonical_url,
-                        {
-                            "burned_video_path": pd.NA,
-                            "status_burned_video_generated": False,
-                        },
-                    )
-                entry = get_manifest_entry(manifest_df, canonical_url)
-                save_manifest(manifest_df, manifest_path)
-            else:
-                print("[WARNING] Video, audio, or ass file not available, skipping subtitle burn.")
-    else: # If burning subtitles is not needed
-        if burned_video_status_from_manifest is not False or pd.notna(burned_video_path_from_manifest):
-            manifest_df = update_manifest_entry(
-                manifest_df,
-                canonical_url,
-                {"burned_video_path": pd.NA, "status_burned_video_generated": False},
-            )
-            entry = get_manifest_entry(manifest_df, canonical_url)
-            save_manifest(manifest_df, manifest_path)
-
-    print(f"[INFO] Processing for {canonical_url} complete.")
-    return manifest_df
-
-
-# --- Manage Command Handlers ---
-def handle_remove_url(url_to_remove_input, manifest_df, manifest_path):
-    video_info, url_to_remove_canonical = get_yt_object_and_canonical_url(url_to_remove_input)
-
-    if not video_info:
-        print(
-            f"[WARNING] Could not get canonical URL for '{url_to_remove_input}'. Trying to remove using the provided input."
-        )
-        url_to_remove_canonical = url_to_remove_input
-    # If yt_remove is successful, canonical_url is used silently.
-
-    entry = get_manifest_entry(manifest_df, url_to_remove_canonical)
-    if entry is None:
-        if url_to_remove_canonical != url_to_remove_input: # If canonical was different and not found
-            # Attempt to find using the original input if canonical lookup failed
-            entry = get_manifest_entry(manifest_df, url_to_remove_input)
-            if entry is None:
-                print(
-                    f"[INFO] URL not found in manifest (tried canonical and original input): {url_to_remove_input}"
-                )
-                return manifest_df
-            else: # Original input was found
-                url_to_remove_canonical = url_to_remove_input
-                print(f"[INFO] Found URL using original input: {url_to_remove_canonical}")
-        else: # Original input was used (same as canonical or canonical failed early), and not found
-            print(f"[INFO] URL not found in manifest: {url_to_remove_canonical}")
-            return manifest_df
-
-    print(
-        f"[INFO] Removing URL '{url_to_remove_canonical}' and associated files from manifest."
-    )
-    files_to_delete = [
-        entry.get("video_path"),
-        entry.get("mp3_path"),
-        entry.get("transcript_path"),
-        entry.get("analysis_path"),
-        entry.get("caption_srt_path"),
-        entry.get("caption_ass_path"),
-        entry.get("burned_video_path"),
-    ]
-    for file_path_obj in files_to_delete:
-        if pd.notna(file_path_obj) and str(file_path_obj).strip():
-            file_path = str(file_path_obj)
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    print(f"[SUCCESS] Deleted file: {file_path}")
+                    os.remove(path)
+                    print(f"[SUCCESS] Deleted file: {path}")
                 except OSError as e:
-                    print(f"[ERROR] Could not delete file {file_path}: {e}")
-            else:
-                print(
-                    f"[INFO] File not found (already deleted or path incorrect?): {file_path}"
-                )
-        elif pd.notna(file_path_obj): # Path was in manifest but resolved to empty string or just spaces
-             print(f"[INFO] Path in manifest was present but empty or invalid: '{file_path_obj}'")
+                    print(f"[ERROR] Could not delete file {path}: {e}")
+
+        self.manifest_df = self.manifest_df[
+            self.manifest_df["youtube_url"] != canonical_url
+        ].reset_index(drop=True)
+        save_manifest(self.manifest_df, self.manifest_path)
+        print(f"[SUCCESS] Removed entry for {canonical_url} from manifest.")
 
 
-    manifest_df = manifest_df[
-        manifest_df["youtube_url"] != url_to_remove_canonical
-    ].reset_index(drop=True)
-    print(f"[SUCCESS] Removed entry for {url_to_remove_canonical} from manifest.")
-    save_manifest(manifest_df, manifest_path) # Save after removal
-    return manifest_df
+# --- CLI Entry Points ---
+def process_youtube_url(args):
+    orchestrator = Orchestrator(args)
+    orchestrator.process_url(args.url)
 
+def handle_list_manifest(args):
+    orchestrator = Orchestrator(args)
+    orchestrator.list_manifest()
 
-def handle_list_manifest(manifest_df):
-    if manifest_df.empty:
-        print("[INFO] Manifest is empty.")
-        return
-    print("\n--- Manifest Contents ---")
-    with pd.option_context(
-        "display.max_colwidth", 50, "display.width", 1000, "display.max_rows", 25
-    ):
-        cols_to_display = ["youtube_url", "base_filename", "status_video_downloaded", "status_mp3_converted", "status_transcript_generated", "status_analysis_generated", "status_captions_generated", "status_burned_video_generated"]
-        # Filter out columns that might not exist to prevent errors
-        cols_to_display = [col for col in cols_to_display if col in manifest_df.columns]
-        if not cols_to_display:
-            print(manifest_df.head(20).to_string()) # Fallback to all if preferred are missing
-        else:
-            print(manifest_df[cols_to_display].head(20).to_string())
-
-    print(f"--- Total entries: {len(manifest_df)} ---")
-    print("--- End of Manifest List ---")
-
-def handle_generate_video(args, manifest_df):
-    video_info, canonical_url = get_yt_object_and_canonical_url(args.url)
-    if not video_info:
-        print(f"[ERROR] Could not process URL: {args.url}")
-        return
-
-    entry = get_manifest_entry(manifest_df, canonical_url)
-    if entry is None:
-        print(f"[ERROR] No manifest entry found for URL: {canonical_url}")
-        print("        Please process the video first using the 'process' command.")
-        return
-
-    base_name = entry.get("base_filename")
-    video_path = entry.get("video_path")
-    mp3_path = entry.get("mp3_path")
-    ass_path = entry.get("caption_ass_path")
-
-    # Convert pd.NA to None for boolean evaluation in all()
-    base_name = None if pd.isna(base_name) else base_name
-    video_path = None if pd.isna(video_path) else video_path
-    mp3_path = None if pd.isna(mp3_path) else mp3_path
-    ass_path = None if pd.isna(ass_path) else ass_path
-
-    if not all([base_name, video_path, mp3_path, ass_path]):
-        print("[ERROR] Manifest entry is missing required data (base_filename, video_path, mp3_path, or ass_path).")
-        return
-
-    if not os.path.exists(video_path):
-        print(f"[ERROR] Video file not found at path: {video_path}")
-        return
-    if not os.path.exists(mp3_path):
-        print(f"[ERROR] Audio file not found at path: {mp3_path}")
-        return
-    if not os.path.exists(ass_path):
-        print(f"[ERROR] ASS caption file not found at path: {ass_path}")
-        return
-
-    # Create the output directory
-    output_dir = os.path.join(os.getcwd(), "captioned_videos")
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Construct the output path
-    output_filename = f"{base_name}_captioned.mp4"
-    output_path = os.path.join(output_dir, output_filename)
-
-    generate_video_with_captions(video_path, mp3_path, ass_path, output_path)
+def handle_remove_url(args):
+    orchestrator = Orchestrator(args)
+    orchestrator.remove_url(args.url)
