@@ -54,8 +54,8 @@ class ClipVideoStep(ProcessingStep):
             try:
                 command = [
                     "ffmpeg", "-y",
+                    "-ss", start_time.replace(",", "."), # Placed before -i
                     "-i", self.burned_video_path,
-                    "-ss", start_time.replace(",", "."),
                     "-to", end_time.replace(",", "."),
                     "-c", "copy",
                     clip_output_path,
