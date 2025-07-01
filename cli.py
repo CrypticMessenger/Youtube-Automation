@@ -121,6 +121,11 @@ def parse_arguments():
         action="store_true",
         help="Force re-processing, ignoring cached files/statuses.",
     )
+    process_parser.add_argument(
+        "--clip-video",
+        action="store_true",
+        help="Ensures viral clips are extracted from the video.",
+    )
 
     # --- Manage Command ---
     manage_parser = subparsers.add_parser(

@@ -5,6 +5,7 @@ captions/*
 captioned_videos/*
 viral_analysis/*
 viral_clip_timestamps/*
+viral_clips/*
 .env
 __pycache__
 processing_manifest.csv
