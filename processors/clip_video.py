@@ -7,6 +7,11 @@ from .base import ProcessingStep, Colors
 
 
 class ClipVideoStep(ProcessingStep):
+    @staticmethod
+    def _time_to_seconds(time_str):
+        time_str = time_str.split(",")[0] if "," in time_str else time_str
+        h, m, s = map(float, time_str.split(":"))
+        return h * 3600 + m * 60 + s
     def __init__(self, entry, args):
         super().__init__(entry, args)
         self.clips_output_dir = os.path.join(self.args.output, "viral_clips")
@@ -50,18 +55,53 @@ class ClipVideoStep(ProcessingStep):
                 print(f"{Colors.WARNING}[WARNING]{Colors.RESET} Skipping segment {i+1} due to missing timestamps.")
                 continue
 
-            print(f"{Colors.INFO}[INFO]{Colors.RESET} Clipping segment {i+1}: {start_time} -> {end_time}")
+            # Convert to seconds, round to nearest second, and convert back to string
+            start_time_sec = str(int(round(self._time_to_seconds(start_time))))
+            end_time_sec = str(int(round(self._time_to_seconds(end_time))))
+
+            # add -1 to start time and +1 to end time
+            start_time_sec = str(int(start_time_sec) - 1)
+            end_time_sec = str(int(end_time_sec) + 1)
+            # Ensure the start time is not negative
+            if int(start_time_sec) < 0:
+                start_time_sec = "0"
+
+            print(f"{Colors.INFO}[INFO]{Colors.RESET} Clipping segment {i+1}: {start_time_sec} -> {end_time_sec}")
             try:
-                command = [
-                    "ffmpeg", "-y",
-                    "-ss", start_time.replace(",", "."), # Placed before -i
-                    "-i", self.burned_video_path,
-                    "-to", end_time.replace(",", "."),
-                    "-c", "copy",
-                    clip_output_path,
-                ]
+                if getattr(self.args, 'no_reel', False):
+                    print(f"{Colors.INFO}[INFO]{Colors.RESET} Re-encoding to 16:9 horizontal aspect ratio.")
+                    command = [
+                        "ffmpeg", "-y",
+                        "-i", self.burned_video_path,
+                        "-ss", start_time_sec,
+                        "-to", end_time_sec,
+                        "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
+                        "-c:v", "libx264",
+                        "-preset", "veryfast",
+                        "-crf", "23",
+                        "-c:a", "aac",
+                        "-b:a", "128k",
+                        "-avoid_negative_ts", "make_zero",
+                        clip_output_path,
+                    ]
+                else:
+                    print(f"{Colors.INFO}[INFO]{Colors.RESET} Re-encoding to 9:16 vertical aspect ratio for Reels/Shorts.")
+                    command = [
+                        "ffmpeg", "-y",
+                        "-i", self.burned_video_path,
+                        "-ss", start_time_sec,
+                        "-to", end_time_sec,
+                        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
+                        "-c:v", "libx264",
+                        "-preset", "veryfast",
+                        "-crf", "23",
+                        "-c:a", "aac",
+                        "-b:a", "128k",
+                        "-avoid_negative_ts", "make_zero",
+                        clip_output_path,
+                    ]
                 subprocess.run(
-                    command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+                    command, check=True
                 )
                 print(f"{Colors.SUCCESS}[SUCCESS]{Colors.RESET} Saved clip to {clip_output_path}")
             except subprocess.CalledProcessError as e:

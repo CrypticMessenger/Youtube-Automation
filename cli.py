@@ -126,6 +126,11 @@ def parse_arguments():
         action="store_true",
         help="Ensures viral clips are extracted from the video.",
     )
+    process_parser.add_argument(
+        "--no-reel",
+        action="store_true",
+        help="Disable 9:16 aspect ratio re-encoding for viral clips, using simple copy instead.",
+    )
 
     # --- Manage Command ---
     manage_parser = subparsers.add_parser(
