@@ -92,6 +92,11 @@ def parse_arguments():
         help="Gemini model for clip identification.",
     )
     process_parser.add_argument(
+        "--niche",
+        default=None,
+        help="Niche prompt to refine viral clip identification.",
+    )
+    process_parser.add_argument(
         "--generate-captions",
         action="store_true",
         help="Generate caption files (.srt, .ass) using stable-whisper.",
