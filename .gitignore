@@ -3,6 +3,7 @@ transcripts/*
 videos/*
 captions/*
 captioned_videos/*
+captioned_clips/*
 viral_analysis/*
 viral_clip_timestamps/*
 viral_clips/*

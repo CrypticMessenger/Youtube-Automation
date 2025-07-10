@@ -117,6 +117,11 @@ def parse_arguments():
         help="Burn .ass subtitles into the video. Requires --generate-captions.",
     )
     process_parser.add_argument(
+        "--burn-clips",
+        action="store_true",
+        help="Burn .ass subtitles into the video clips. Requires --generate-captions.",
+    )
+    process_parser.add_argument(
         "--burned-video-dir",
         default=None,
         help="Directory for videos with burned subtitles (default: [OUTPUT]/burned_videos)",

@@ -15,9 +15,7 @@ class ClipVideoStep(ProcessingStep):
     def __init__(self, entry, args):
         super().__init__(entry, args)
         self.clips_output_dir = os.path.join(self.args.output, "viral_clips")
-        self.burned_video_path = os.path.join(
-            self.args.output, "captioned_videos", f"{self.base_name}_captioned.mp4"
-        )
+        self.video_path = self.entry.get("video_path")
         self.timestamp_file_path = os.path.join(
             self.args.output, "viral_clip_timestamps", f"{self.base_name}_timestamps.json"
         )
@@ -32,8 +30,8 @@ class ClipVideoStep(ProcessingStep):
         return False
 
     def process(self):
-        if not os.path.exists(self.burned_video_path):
-            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Burned video not found at: {self.burned_video_path}")
+        if not os.path.exists(self.video_path):
+            print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Video not found at: {self.video_path}")
             return self.entry
         if not os.path.exists(self.timestamp_file_path):
             print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Timestamps JSON not found at: {self.timestamp_file_path}")
@@ -72,7 +70,7 @@ class ClipVideoStep(ProcessingStep):
                     print(f"{Colors.INFO}[INFO]{Colors.RESET} Re-encoding to 16:9 horizontal aspect ratio.")
                     command = [
                         "ffmpeg", "-y",
-                        "-i", self.burned_video_path,
+                        "-i", self.video_path,
                         "-ss", start_time_sec,
                         "-to", end_time_sec,
                         "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
@@ -88,7 +86,7 @@ class ClipVideoStep(ProcessingStep):
                     print(f"{Colors.INFO}[INFO]{Colors.RESET} Re-encoding to 9:16 vertical aspect ratio for Reels/Shorts.")
                     command = [
                         "ffmpeg", "-y",
-                        "-i", self.burned_video_path,
+                        "-i", self.video_path,
                         "-ss", start_time_sec,
                         "-to", end_time_sec,
                         "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",

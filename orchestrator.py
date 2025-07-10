@@ -19,18 +19,18 @@ from processors import (
     CaptionGenerationStep,
     ViralAnalysisStep,
     ViralTimestampsStep,
-    BurnVideoStep,
     ClipVideoStep,
+    BurnClipsStep,
 )
 from processors.base import Colors
 
 # --- Dependency Graph Definition ---
 
 STEP_DEPENDENCIES = {
-    ClipVideoStep: [BurnVideoStep, ViralTimestampsStep],
-    BurnVideoStep: [VideoDownloadStep, CaptionGenerationStep],
+    BurnClipsStep: [ClipVideoStep, CaptionGenerationStep],
+    ClipVideoStep: [ViralTimestampsStep, VideoDownloadStep],
     ViralTimestampsStep: [ViralAnalysisStep],
-    ViralAnalysisStep: [CaptionGenerationStep], # Changed dependency from TranscriptionStep
+    ViralAnalysisStep: [CaptionGenerationStep],
     CaptionGenerationStep: [AudioExtractionStep],
     AudioExtractionStep: [VideoDownloadStep],
     VideoDownloadStep: [],
@@ -43,8 +43,9 @@ FULL_PIPELINE = [
     CaptionGenerationStep, # Removed TranscriptionStep
     ViralAnalysisStep,
     ViralTimestampsStep,
-    BurnVideoStep,
+    BurnClipsStep,
     ClipVideoStep,
+    BurnClipsStep,
 ]
 
 
@@ -83,8 +84,8 @@ class Orchestrator:
         targets = []
         if getattr(self.args, 'clip_video', False):
             targets.append(ClipVideoStep)
-        if getattr(self.args, 'burn_video', False):
-            targets.append(BurnVideoStep)
+        if getattr(self.args, 'burn_clips', False):
+            targets.append(BurnClipsStep)
         if getattr(self.args, 'get_viral_timestamps', False):
             targets.append(ViralTimestampsStep)
         if getattr(self.args, 'viral_short_identifier', False):

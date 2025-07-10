@@ -6,7 +6,7 @@ from .audio_extraction import AudioExtractionStep
 from .caption_generation import CaptionGenerationStep
 from .viral_analysis import ViralAnalysisStep
 from .viral_timestamps import ViralTimestampsStep
-from .burn_video import BurnVideoStep
+from .burn_clips import BurnClipsStep
 from .clip_video import ClipVideoStep
 
 __all__ = [

@@ -77,7 +77,6 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections, n
         f"please identify {num_sections_str} of the most promising segments."
     )
 
-    )
 
     niche_section_text = ""
     if niche_prompt and niche_prompt.strip():
