@@ -88,14 +88,12 @@ class BurnClipsStep(ProcessingStep):
             adjusted_ass_lines = []
             for line in ass_content_lines:
                 if line.startswith("Style:"):
-                    parts = line.strip().split(",", 3)
-                    parts[2] = "16" # Change font size to 16
-                    # Adjust MarginV (vertical margin) to move subtitles up
-                    # MarginV is the 21st element (index 20) in the Style line
-                    style_parts = line.strip().split(",")
-                    if len(style_parts) > 20:
-                        style_parts[20] = "50" # Set MarginV to 50 (adjust as needed)
-                        adjusted_ass_lines.append(",".join(style_parts) + "\n")
+                    parts = line.strip().split(",")
+                    if len(parts) > 21: # Ensure enough parts for Fontsize, Alignment, and MarginV
+                        parts[2] = "12" # Fontsize
+                        parts[18] = "2" # Alignment (2 for bottom-center)
+                        parts[21] = "69" # MarginV (vertical margin from bottom)
+                        adjusted_ass_lines.append(",".join(parts) + "\n")
                     else:
                         adjusted_ass_lines.append(line) # Fallback if format is unexpected
                 elif line.startswith("Dialogue:"):
