@@ -7,7 +7,7 @@ from processors.base import Colors
 
 # --- Gemini Interaction Functions ---
 
-def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): # Renamed to avoid conflict if we later import the original prompts.py for some reason
+def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections, niche_prompt=None): # Renamed to avoid conflict if we later import the original prompts.py for some reason
     """
     Generates the prompt text for identifying viral clips using a detailed template.
     The number of sections and transcript are injected into the template.
@@ -35,6 +35,8 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): 
     Standalone Cohesion: The segment must make sense on its own, without requiring extensive context from the rest of the video.
     Clear Start & End Points: Identify precise start & end phrases/sentences for seamless trimming.
     Number of Sections: {number_of_sections_placeholder}
+
+    {niche_prompt_section_placeholder}
 
     Output Format for Each Identified Segment:
     Please provide your findings in the following format for EACH identified segment:
@@ -75,16 +77,23 @@ def get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections): 
         f"please identify {num_sections_str} of the most promising segments."
     )
 
+    )
+
+    niche_section_text = ""
+    if niche_prompt and niche_prompt.strip():
+        niche_section_text = f"Additionally, consider the following niche focus for identifying clips: {niche_prompt}\n"
+
     return prompt_template.format(
         number_of_sections_placeholder=number_of_sections_placeholder_text,
         transcript_text=transcript_text,
+        niche_prompt_section_placeholder=niche_section_text,
     )
 
 
 
 
 def identify_viral_clips_gemini(
-    transcript_text, number_of_sections, model_name, analysis_output_dir, base_filename
+    transcript_text, number_of_sections, model_name, analysis_output_dir, base_filename, niche_prompt=None
 ):
     if not transcript_text or not transcript_text.strip():
         print(f"{Colors.ERROR}[ERROR]{Colors.RESET} Transcript text is empty for viral clip ID.")
@@ -100,7 +109,7 @@ def identify_viral_clips_gemini(
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name=model_name)
-        prompt = get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections)
+        prompt = get_viral_clip_identifier_prompt_text(transcript_text, number_of_sections, niche_prompt)
         response = model.generate_content([prompt], request_options={"timeout": 900})
 
         analysis_text = ""

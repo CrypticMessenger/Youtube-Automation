@@ -32,12 +32,14 @@ class ViralAnalysisStep(ProcessingStep):
             return self.entry
 
         os.makedirs(self.args.effective_analysis_dir, exist_ok=True)
+        niche_prompt = self.args.niche if hasattr(self.args, 'niche') else None
         analysis_path = identify_viral_clips_gemini(
             transcript_text,
             self.args.number_of_sections,
             self.args.clip_identifier_model,
             self.args.effective_analysis_dir,
             self.base_name,
+            niche_prompt=niche_prompt,
         )
 
         if (
