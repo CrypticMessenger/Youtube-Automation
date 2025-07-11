@@ -1,3 +1,7 @@
+# Project Status: Discontinued
+
+You can read more about the decision and the story of this project in the [blog post](BLOG.md).
+
 # YouTube Video Processing Toolkit
 
 This project provides a command-line toolkit to download, process, and analyze YouTube videos. It now features an intelligent orchestration system that automatically handles dependencies between processing steps, ensuring a smooth and efficient workflow.
@@ -177,13 +181,13 @@ The project is structured around a flexible, step-based processing pipeline mana
 
 ```mermaid
 graph TD
-  A[Video Download] --> B[Audio Extraction]
-  B --> C[Caption Generation & Transcription]
-  C --> D[Viral Clip Analysis]
-  C --> E[Burn Video]
-  D --> F[Viral Clip Timestamps]
-  E --> G[Clip Video]
-  F --> G
+    A[Video Download] --> B[Audio Extraction]
+    B --> C[Caption Generation & Transcription]
+    C --> D[Viral Clip Analysis]
+    D --> E[Viral Clip Timestamps]
+    A --> F[Clip & Burn Video]
+    C --> F
+    E --> F
 ```
 
 ## Implementation Plan / TODOs
